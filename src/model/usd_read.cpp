@@ -114,9 +114,19 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
 
   ty::RenderScene rs;
   ty::RenderSceneConverter conv;
-  if (!conv.ConvertToRenderScene(env, &rs))
-    return Result::error(Status::Unreadable, "This model can't be read: " + conv.GetError());
-  if (!conv.GetWarning().empty()) ctx.warn("USD: " + conv.GetWarning().substr(0, 400));
+  std::string convWarning;
+  if (conv.ConvertToRenderScene(env, &rs)) {
+    convWarning = conv.GetWarning();
+  } else {
+    // Tydra's vertex re-indexing rejects some valid meshes; face-varying data is expanded below instead.
+    env.mesh_config.build_vertex_indices = false;
+    rs = ty::RenderScene();
+    ty::RenderSceneConverter retry;
+    if (!retry.ConvertToRenderScene(env, &rs))
+      return Result::error(Status::Unreadable, "This model can't be read: " + retry.GetError().substr(0, 600));
+    convWarning = retry.GetWarning();
+  }
+  if (!convWarning.empty()) ctx.warn("USD: " + convWarning.substr(0, 400));
 
   const auto& metas = stage.metas();
   const auto axis = metas.upAxis.get_value();
