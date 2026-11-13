@@ -167,6 +167,10 @@ writer, WAV / AIFF / CAF, the TIFF codec and the resampler. Nothing GPL or LGPL 
   unsupported. HEIC images above ~35 megapixels are refused (no grid tiling yet).
 - M4A/AAC read and write use OS codecs only; MP3 write needs Media Foundation (Windows) or an encoder plugin.
 - Skinned / animated USD is read as its rest pose; animation is not carried over.
+- 3D textures the image codecs can't decode (EXR, for example) are dropped with a warning.
+- OBJ output writes the base colour, normal, emissive and opacity maps Assimp's OBJ exporter supports; metallic /
+  roughness go to USD and glTF only.
+- glTF output packs metallic and roughness into one texture (glTF's metallicRoughness layout).
 
 ## Licence
 
