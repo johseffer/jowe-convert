@@ -1,0 +1,10 @@
+module JoweConvertC {
+    header "jowe/convert_plugin.h"
+    export *
+}
+
+module JoweConvert {
+    header "jowe/convert.hpp"
+    requires cplusplus
+    export *
+}

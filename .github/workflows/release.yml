@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: publish ${{ github.ref_name }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tag="${GITHUB_REF_NAME}"
+          for os in windows-x64 macos-arm64 linux-x64 linux-arm64; do
+            dir="artifacts/jvconvert-$os"
+            if [ "$os" = windows-x64 ]; then
+              (cd "$dir" && zip -q -r "../../dist/jvconvert-$tag-$os.zip" .)
+            else
+              chmod +x "$dir/jvconvert"
+              tar -C "$dir" -czf "dist/jvconvert-$tag-$os.tar.gz" .
+            fi
+          done
+          (cd artifacts/jvconvert-wasm && zip -q -r "../../dist/jvconvert-$tag-wasm.zip" .)
+          cp artifacts/jowe-convert-apple-xcframework/jowe-convert-apple.xcframework.zip dist/
+          (cd dist && sha256sum * > SHA256SUMS)
+          cat dist/SHA256SUMS
+          checksum=$(cat artifacts/jowe-convert-apple-xcframework/jowe-convert-apple.xcframework.zip.checksum)
+          {
+            echo "SwiftPM: set \`releaseTag = \"$tag\"\` and \`xcframeworkChecksum = \"$checksum\"\` in Package.swift."
+          } > notes.md
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" dist/* --verify-tag --title "jowe-convert $tag" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
+          fi
