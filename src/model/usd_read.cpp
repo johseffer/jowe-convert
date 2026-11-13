@@ -87,7 +87,7 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
   if (!tinyusdz::LoadUSDFromMemory(data.data(), data.size(), filename, &stage, &warn, &err, opts))
     return Result::error(Status::Unreadable, "This model can't be read: " + err);
 
-  const bool usdz = tinyusdz::IsUSDZ(data.data(), data.size());
+  const bool usdz = data.size() > 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4;
   ty::RenderSceneConverterEnv env(stage);
   env.mesh_config.triangulate = true;
   env.mesh_config.build_vertex_indices = true;
