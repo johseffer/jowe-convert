@@ -147,6 +147,7 @@ Result convertModel(const Context& ctx, const fs::path& in, const std::string& i
   Scene scene;
   if (auto r = loadScene(ctx, in, inFormat, scene); !r) return r;
   if (scene.meshes.empty()) return Result::error(Status::Unreadable, "The model holds no meshes");
+  if (ctx.input) ctx.input->model = sceneStats(scene);
   if (ctx.cancelled()) return Result::error(Status::Cancelled, "Cancelled");
   ctx.progress(0.4);
 
@@ -194,6 +195,7 @@ Result convertModel(const Context& ctx, const fs::path& in, const std::string& i
   Context quiet = ctx;
   quiet.warnings = nullptr;
   quiet.written = nullptr;
+  quiet.input = nullptr;
   ConvertOptions probeOpts = *ctx.options;
   probeOpts.model = ModelOptions{};
   quiet.options = &probeOpts;

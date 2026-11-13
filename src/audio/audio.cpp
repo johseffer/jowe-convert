@@ -179,7 +179,7 @@ Result convertAudio(const Context& ctx, const fs::path& in, const std::string& i
   if (opt.sampleRate < 0 || (opt.sampleRate && (opt.sampleRate < 8000 || opt.sampleRate > 384000)))
     return Result::error(Status::InvalidArgument, "sample rate must be 8000..384000 Hz");
 
-  const bool encoded = outFormat == "m4a" || outFormat == "mp3";
+  const bool encoded = outFormat != "wav" && outFormat != "aiff" && outFormat != "caf" && outFormat != "flac";
   bool useOs = false;
   const jc_encoder_plugin* plugin = nullptr;
   if (encoded) {

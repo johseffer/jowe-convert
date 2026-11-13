@@ -72,7 +72,7 @@ TEST(image_heic_encode) {
   auto p = jc::probe(dir / "a.heic");
   REQUIRE(p.result);
   CHECK(p.info.codec == "hvc1");
-  CHECK(p.info.width == 122 && p.info.height == 68);
+  CHECK(p.info.width == 121 && p.info.height == 67);
   auto bytes = readAll(dir / "a.heic");
   CHECK(bytes.size() > 100 && std::memcmp(bytes.data() + 4, "ftypheic", 8) == 0);
   if (f->canRead) {

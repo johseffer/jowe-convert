@@ -97,6 +97,7 @@ ConvertReport convert(const fs::path& input, const fs::path& output, const Conve
   ctx.options = &options;
   ctx.warnings = &rep.warnings;
   ctx.written = &rep.writtenFiles;
+  ctx.input = &rep.input;
   auto fail = [&](Status s, std::string msg) {
     rep.result = Result::error(s, std::move(msg));
     return rep;
@@ -126,6 +127,10 @@ ConvertReport convert(const fs::path& input, const fs::path& output, const Conve
   rep.input.kind = in->kind;
   rep.input.format = in->id;
   rep.input.fileSize = fs::file_size(input, ec);
+  if (in->kind != MediaKind::Model) {
+    auto pr = probe(input, options.access);
+    if (pr.result) rep.input = pr.info;
+  }
   ctx.progress(0.0);
   switch (in->kind) {
     case MediaKind::Image:

@@ -25,12 +25,14 @@ namespace ty = tinyusdz::tydra;
 struct LoaderState {
   const Context* ctx;
   bool usdz;
+  bool textures;
 };
 
 bool loadTextureRaw(const tinyusdz::value::AssetPath& assetPath, const tinyusdz::AssetInfo&,
                     const tinyusdz::AssetResolutionResolver& resolver, ty::TextureImage* imageOut,
                     std::vector<uint8_t>* imageData, void* userdata, std::string* warn, std::string* err) {
   auto* st = static_cast<LoaderState*>(userdata);
+  if (!st->textures) return false;
   const std::string name = assetPath.GetAssetPath();
   std::string resolved = resolver.resolve(name);
   if (resolved.empty()) {
@@ -91,8 +93,9 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
   env.mesh_config.build_vertex_indices = true;
   env.mesh_config.compute_tangents_and_binormals = false;
   env.mesh_config.compute_normals = false;
-  env.scene_config.load_texture_assets = ctx.options ? ctx.options->model.textures : true;
-  LoaderState state{&ctx, usdz};
+  // Tydra marks images from a custom loader as decoded; ours hands back the raw file bytes.
+  env.scene_config.load_texture_assets = true;
+  LoaderState state{&ctx, usdz, ctx.options ? ctx.options->model.textures : true};
   env.material_config.texture_image_loader_function = loadTextureRaw;
   env.material_config.texture_image_loader_function_userdata = &state;
   env.material_config.preserve_texel_bitdepth = true;
@@ -115,14 +118,17 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
     return Result::error(Status::Unreadable, "This model can't be read: " + conv.GetError());
   if (!conv.GetWarning().empty()) ctx.warn("USD: " + conv.GetWarning().substr(0, 400));
 
-  scene.upAxis = rs.meta.upAxis.empty() ? "Y" : rs.meta.upAxis;
-  scene.metersPerUnit = rs.meta.metersPerUnit > 0 ? rs.meta.metersPerUnit : 0.01;
+  const auto& metas = stage.metas();
+  const auto axis = metas.upAxis.get_value();
+  scene.upAxis = axis == tinyusdz::Axis::Z ? "Z" : (axis == tinyusdz::Axis::X ? "X" : "Y");
+  const double mpu = metas.metersPerUnit.get_value();
+  scene.metersPerUnit = mpu > 0 ? mpu : 1.0;
   scene.unitsKnown = true;
 
   std::vector<int> imageToTexture(rs.images.size(), -1);
   for (size_t i = 0; i < rs.images.size(); ++i) {
     const auto& img = rs.images[i];
-    if (img.buffer_id < 0 || size_t(img.buffer_id) >= rs.buffers.size() || img.decoded) continue;
+    if (img.buffer_id < 0 || size_t(img.buffer_id) >= rs.buffers.size()) continue;
     SceneTexture t;
     t.data = rs.buffers[size_t(img.buffer_id)].data;
     if (t.data.empty()) continue;
@@ -263,6 +269,12 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
 
   scene.nodes.emplace_back();
   scene.nodes[0].name = "Root";
+  std::function<bool(const ty::Node&)> hasMesh = [&](const ty::Node& n) {
+    if (n.nodeType == ty::NodeType::Mesh && n.id >= 0) return true;
+    for (const auto& c : n.children)
+      if (hasMesh(c)) return true;
+    return false;
+  };
   std::function<int(const ty::Node&)> build = [&](const ty::Node& n) -> int {
     int at = int(scene.nodes.size());
     scene.nodes.emplace_back();
@@ -274,12 +286,14 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
     if (n.nodeType == ty::NodeType::Mesh && n.id >= 0 && size_t(n.id) < meshParts.size())
       scene.nodes[size_t(at)].meshes = meshParts[size_t(n.id)];
     for (const auto& c : n.children) {
+      if (!hasMesh(c)) continue;
       int ci = build(c);
       scene.nodes[size_t(at)].children.push_back(ci);
     }
     return at;
   };
   for (const auto& n : rs.nodes) {
+    if (!hasMesh(n)) continue;
     int ci = build(n);
     scene.nodes[0].children.push_back(ci);
   }

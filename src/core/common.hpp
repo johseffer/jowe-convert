@@ -33,6 +33,7 @@ struct Context {
   const ConvertOptions* options = nullptr;
   std::vector<std::string>* warnings = nullptr;
   std::vector<fs::path>* written = nullptr;
+  ProbeInfo* input = nullptr;
 
   bool cancelled() const {
     return options && options->cancel && options->cancel->load(std::memory_order_relaxed);

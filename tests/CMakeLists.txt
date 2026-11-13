@@ -44,6 +44,7 @@ endif()
 
 foreach(name IN LISTS _jc_test_names)
   add_test(NAME ${name} COMMAND jc_tests ${name})
+  set_tests_properties(${name} PROPERTIES LABELS jowe)
 endforeach()
 
 if(TARGET jvconvert)
@@ -59,4 +60,8 @@ if(TARGET jvconvert)
       "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}"
       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/cli_smoke
       -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_smoke.cmake)
+endif()
+
+if(TARGET jvconvert)
+  set_tests_properties(mcp_stdio_session cli_smoke PROPERTIES LABELS jowe)
 endif()

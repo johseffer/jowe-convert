@@ -55,6 +55,7 @@ bool heifInfo(const Bytes& in, ImageHeader& h, std::string* codec) {
   if (!findChild(in, iprp.payload, iprp.end, "ipco", ipco)) return false;
   Box box;
   bool found = false;
+  int clapW = 0, clapH = 0;
   for (size_t at = ipco.payload; nextBox(in, at, ipco.end, box); at = box.end) {
     if (box.type == "ispe" && !found) {
       ByteReader r(in.data(), box.end);
@@ -63,6 +64,14 @@ bool heifInfo(const Bytes& in, ImageHeader& h, std::string* codec) {
       if (uint64_t(w) * ht > uint64_t(h.width) * h.height) {
         h.width = int(w);
         h.height = int(ht);
+      }
+    } else if (box.type == "clap") {
+      ByteReader r(in.data(), box.end);
+      r.seek(box.payload);
+      uint32_t wn = r.be32(), wd = r.be32(), hn = r.be32(), hd = r.be32();
+      if (r.ok() && wd && hd) {
+        clapW = int(wn / wd);
+        clapH = int(hn / hd);
       }
     } else if (box.type == "hvcC" && codec && codec->empty()) {
       *codec = "hvc1";
@@ -77,6 +86,10 @@ bool heifInfo(const Bytes& in, ImageHeader& h, std::string* codec) {
     }
   }
   if (!h.channels) h.channels = 3;
+  if (clapW > 0 && clapH > 0 && clapW <= h.width && clapH <= h.height) {
+    h.width = clapW;
+    h.height = clapH;
+  }
   return h.width > 0 && h.height > 0;
 }
 
@@ -141,8 +154,9 @@ bool heicEncoderAvailable(std::string*) { return true; }
 bool heicEncode(const Image& img, int quality, Bytes& out, std::string& err) {
   const kvz_api* api = kvz_api_get(8);
   if (!api) { err = "kvazaar is unavailable"; return false; }
-  const int w = img.width + (img.width & 1);
-  const int h = img.height + (img.height & 1);
+  // kvazaar reads whole 8x8 blocks; the padding is cropped again with a clap property.
+  const int w = (img.width + 7) & ~7;
+  const int h = (img.height + 7) & ~7;
   if (uint64_t(w) * h > 35651584ull || w > 16888 || h > 16888) {
     err = "HEIC is limited to about 35 megapixels in this version; use --max-size";
     return false;

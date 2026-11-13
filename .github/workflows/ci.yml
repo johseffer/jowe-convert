@@ -38,7 +38,7 @@ jobs:
 
       - name: Test
         shell: bash
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 600
+        run: ctest --test-dir build -C Release -L jowe --output-on-failure --timeout 600
 
       - name: Formats on this runner
         shell: bash
@@ -86,7 +86,7 @@ jobs:
       - name: Test (node)
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
-          ctest --test-dir build-wasm --output-on-failure --timeout 900
+          ctest --test-dir build-wasm -L jowe --output-on-failure --timeout 900
 
       - name: Collect
         run: |
