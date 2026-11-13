@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest, exe: jvconvert.exe }
+          - { name: macos-arm64, os: macos-latest, exe: jvconvert }
+          - { name: linux-x64, os: ubuntu-latest, exe: jvconvert }
+          - { name: linux-arm64, os: ubuntu-24.04-arm, exe: jvconvert }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test
+        shell: bash
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 600
+
+      - name: Formats on this runner
+        shell: bash
+        run: |
+          exe=$(find build -name '${{ matrix.exe }}' -type f | head -1)
+          "$exe" formats
+
+      - name: Collect binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          exe=$(find build -name '${{ matrix.exe }}' -type f | head -1)
+          cp "$exe" LICENSE README.md dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jvconvert-${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+
+  wasm:
+    name: wasm (emscripten)
+    runs-on: ubuntu-latest
+    env:
+      EMSDK_VERSION: 4.0.10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install emsdk
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION"
+
+      - name: Configure
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          emcmake cmake -S . -B build-wasm -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --build build-wasm --parallel 4
+
+      - name: Test (node)
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ctest --test-dir build-wasm --output-on-failure --timeout 900
+
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp build-wasm/cli/jvconvert.js build-wasm/cli/jvconvert.wasm build-wasm/src/libjowe_convert.a LICENSE README.md dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jvconvert-wasm
+          path: dist/
+          if-no-files-found: error
