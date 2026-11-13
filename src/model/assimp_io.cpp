@@ -28,10 +28,13 @@ fs::path u8path(const char* s) {
 #endif
 }
 
-class GuardedIO : public Assimp::DefaultIOSystem {
+class GuardedIO : public Assimp::IOSystem {
  public:
   GuardedIO(const Io& io, std::vector<fs::path>* written) : io_(io), written_(written) {}
-  bool Exists(const char* p) const override { return io_.canRead(u8path(p)) && DefaultIOSystem::Exists(p); }
+  bool Exists(const char* p) const override { return io_.canRead(u8path(p)) && fs_.Exists(p); }
+  char getOsSeparator() const override { return fs_.getOsSeparator(); }
+  void Close(Assimp::IOStream* s) override { fs_.Close(s); }
+  bool ComparePaths(const char* a, const char* b) const override { return fs_.ComparePaths(a, b); }
   Assimp::IOStream* Open(const char* p, const char* mode) override {
     const bool write = std::strchr(mode, 'w') || std::strchr(mode, 'a');
     const fs::path path = u8path(p);
@@ -39,7 +42,7 @@ class GuardedIO : public Assimp::DefaultIOSystem {
       denied = path.string();
       return nullptr;
     }
-    Assimp::IOStream* s = DefaultIOSystem::Open(p, mode);
+    Assimp::IOStream* s = fs_.Open(p, mode);
     if (s && write && written_) written_->push_back(path);
     return s;
   }
@@ -48,6 +51,7 @@ class GuardedIO : public Assimp::DefaultIOSystem {
  private:
   const Io& io_;
   std::vector<fs::path>* written_;
+  mutable Assimp::DefaultIOSystem fs_;
 };
 
 Matrix fromAi(const aiMatrix4x4& m) {

@@ -347,7 +347,7 @@ bool parseMovieFile(const fs::path& path, Movie& mv, std::string& err) {
     }
     if (type == "ftyp" || type == "moov") {
       if (size > (512ull << 20)) { err = "movie header too large"; return false; }
-      Bytes box(size_t(size));
+      Bytes box(static_cast<size_t>(size));
       f.seekg(std::streamoff(at));
       if (!f.read(reinterpret_cast<char*>(box.data()), std::streamsize(size))) { err = "read error"; return false; }
       BoxRef b{type, 0, header, size_t(size)};

@@ -257,15 +257,15 @@ bool heicEncode(const Image& img, int quality, Bytes& out, std::string& err) {
     w.fourcc("heic");
   });
 
-  box(f, "meta", [&](ByteWriter& w) {
-    box(w, "hdlr", [](ByteWriter& b) {
+  box(f, "meta", [&](ByteWriter& mw) {
+    box(mw, "hdlr", [](ByteWriter& b) {
       b.be32(0);
       b.fourcc("pict");
       b.zeros(12);
       b.u8(0);
     }, 0);
-    box(w, "pitm", [](ByteWriter& b) { b.be16(1); }, 0);
-    box(w, "iloc", [&](ByteWriter& b) {
+    box(mw, "pitm", [](ByteWriter& b) { b.be16(1); }, 0);
+    box(mw, "iloc", [&](ByteWriter& b) {
       b.u8(0x44);
       b.u8(0x00);
       b.be16(1);
@@ -275,7 +275,7 @@ bool heicEncode(const Image& img, int quality, Bytes& out, std::string& err) {
       b.be32(0);
       b.be32(uint32_t(slices.size()));
     }, 0);
-    box(w, "iinf", [](ByteWriter& b) {
+    box(mw, "iinf", [](ByteWriter& b) {
       b.be16(1);
       box(b, "infe", [](ByteWriter& e) {
         e.be16(1);
@@ -284,7 +284,7 @@ bool heicEncode(const Image& img, int quality, Bytes& out, std::string& err) {
         e.u8(0);
       }, 2);
     }, 0);
-    box(w, "iprp", [&](ByteWriter& b) {
+    box(mw, "iprp", [&](ByteWriter& b) {
       int props = 0;
       box(b, "ipco", [&](ByteWriter& p) {
         box(p, "hvcC", [&](ByteWriter& c) {
