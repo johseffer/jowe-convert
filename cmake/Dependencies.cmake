@@ -123,7 +123,7 @@ set(CMAKE_BUILD_TYPE "${_jc_saved_build_type}" CACHE STRING "Build type" FORCE)
 
 # TinyUSDZ 0.9.1 relies on <cstdint> arriving transitively, which newer GCC no longer does.
 if(NOT MSVC)
-  target_compile_options(tinyusdz_static PRIVATE -include cstdint)
+  target_compile_options(tinyusdz_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include cstdint>")
 endif()
 
 if(NOT TARGET minimp3_headers)
