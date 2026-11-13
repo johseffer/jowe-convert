@@ -9,11 +9,12 @@ mac_min=12.0
 
 case "$slice" in
   ios-arm64)
-    args=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=$ios_min) ;;
+    args=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_SYSROOT=iphoneos
+          -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=$ios_min) ;;
   iossim-arm64|iossim-x86_64)
-    args=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_ARCHITECTURES=${slice#iossim-}
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=$ios_min) ;;
+    # kvazaar's CMake needs CMAKE_SYSTEM_PROCESSOR, which the iOS platform leaves empty.
+    args=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=${slice#iossim-} -DCMAKE_OSX_SYSROOT=iphonesimulator
+          -DCMAKE_OSX_ARCHITECTURES=${slice#iossim-} -DCMAKE_OSX_DEPLOYMENT_TARGET=$ios_min) ;;
   catalyst-arm64|catalyst-x86_64)
     arch=${slice#catalyst-}
     target="-target $arch-apple-ios$ios_min-macabi"
