@@ -101,7 +101,7 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
   env.material_config.preserve_texel_bitdepth = true;
   tinyusdz::USDZAsset usdzAsset;
   if (usdz) {
-    if (!tinyusdz::ReadUSDZAssetInfoFromMemory(data.data(), data.size(), true, &usdzAsset, &warn, &err))
+    if (!tinyusdz::ReadUSDZAssetInfoFromMemory(data.data(), data.size(), false, &usdzAsset, &warn, &err))
       return Result::error(Status::Unreadable, "This USDZ can't be read: " + err);
     tinyusdz::AssetResolutionResolver arr;
     if (!tinyusdz::SetupUSDZAssetResolution(arr, &usdzAsset))
