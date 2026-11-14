@@ -6,12 +6,15 @@
 #include "tinyusdz.hh"
 #include "asset-resolution.hh"
 #include "tydra/render-data.hh"
+#include "pprinter.hh"
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
 #include <functional>
 #include <map>
+#include <regex>
+#include <sstream>
 
 #include "../image/image.hpp"
 #include "scene.hpp"
@@ -74,6 +77,72 @@ const T* attrData(const ty::VertexAttribute& a, size_t& count) {
   return reinterpret_cast<const T*>(a.data.data());
 }
 
+const char* const kColorInputs = "diffuseColor|emissiveColor|specularColor";
+
+}  // namespace
+
+// ModelIO authors UsdPreviewSurface colours as color4f / float4; TinyUSDZ only takes color3f.
+std::string fixColorInputs(const std::string& usda, int* changed) {
+  static const std::regex decl(std::string(R"(^(\s*)(?:uniform\s+)?(?:color4[fdh]|float4|double4|half4)\s+(inputs:(?:)") +
+                                   kColorInputs + R"())(\.connect)?(\s*=\s*)?(.*)$)");
+  static const std::regex vec4(R"(^\(\s*([^,()]+),\s*([^,()]+),\s*([^,()]+),\s*[^,()]+\)(.*)$)");
+  std::istringstream in(usda);
+  std::string out, line;
+  out.reserve(usda.size());
+  int n = 0;
+  while (std::getline(in, line)) {
+    std::smatch m;
+    if (std::regex_match(line, m, decl)) {
+      std::string value = m[5].str();
+      std::smatch v;
+      if (m[3].matched || !m[4].matched) {
+        line = m[1].str() + "color3f " + m[2].str() + m[3].str() + m[4].str() + value;
+        ++n;
+      } else if (std::regex_match(value, v, vec4)) {
+        line = m[1].str() + "color3f " + m[2].str() + m[4].str() + "(" + v[1].str() + ", " + v[2].str() + ", " +
+               v[3].str() + ")" + v[4].str();
+        ++n;
+      }
+    }
+    out += line;
+    out += '\n';
+  }
+  if (changed) *changed = n;
+  return out;
+}
+
+namespace {
+
+// Second attempt for layers TinyUSDZ refuses: rewrite 4-component colour inputs and parse the text again.
+bool loadWithFixedColors(const Bytes& data, bool usdz, const std::string& filename, tinyusdz::Stage& stage,
+                         const tinyusdz::USDLoadOptions& opts, std::string& err) {
+  const uint8_t* layer = data.data();
+  size_t layerSize = data.size();
+  if (usdz) {
+    std::vector<ZipEntry> entries;
+    std::string zerr;
+    if (!listZip(data, entries, zerr) || entries.empty() || entries[0].method != 0) return false;
+    layer = data.data() + entries[0].dataOffset;
+    layerSize = size_t(entries[0].size);
+  }
+  std::string text;
+  if (layerSize >= 5 && std::memcmp(layer, "#usda", 5) == 0) {
+    text.assign(reinterpret_cast<const char*>(layer), layerSize);
+  } else {
+    tinyusdz::Layer parsed;
+    std::string warn, lerr;
+    if (!tinyusdz::LoadLayerFromMemory(layer, layerSize, filename, &parsed, &warn, &lerr, opts)) return false;
+    text = "#usda 1.0\n" + tinyusdz::to_string(parsed);
+  }
+  int changed = 0;
+  std::string fixed = fixColorInputs(text, &changed);
+  if (!changed) return false;
+  std::string warn;
+  err.clear();
+  return tinyusdz::LoadUSDFromMemory(reinterpret_cast<const uint8_t*>(fixed.data()), fixed.size(), filename, &stage,
+                                     &warn, &err, opts);
+}
+
 }  // namespace
 
 Result loadUsd(const Context& ctx, const fs::path& path, const std::string& format, Scene& scene) {
@@ -84,10 +153,15 @@ Result loadUsd(const Context& ctx, const fs::path& path, const std::string& form
   tinyusdz::USDLoadOptions opts;
   opts.max_memory_limit_in_mb = 8192;
   const std::string filename = path.u8string();
-  if (!tinyusdz::LoadUSDFromMemory(data.data(), data.size(), filename, &stage, &warn, &err, opts))
-    return Result::error(Status::Unreadable, "This model can't be read: " + err);
-
   const bool usdz = data.size() > 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4;
+  if (!tinyusdz::LoadUSDFromMemory(data.data(), data.size(), filename, &stage, &warn, &err, opts)) {
+    std::string retryErr;
+    stage = tinyusdz::Stage();
+    if (!loadWithFixedColors(data, usdz, filename, stage, opts, retryErr))
+      return Result::error(Status::Unreadable, "This model can't be read: " + err.substr(0, 600));
+    ctx.warn("4-component colour inputs were read as RGB (alpha dropped)");
+  }
+
   ty::RenderSceneConverterEnv env(stage);
   env.mesh_config.triangulate = true;
   env.mesh_config.build_vertex_indices = true;

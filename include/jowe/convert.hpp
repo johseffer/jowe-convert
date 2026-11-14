@@ -72,10 +72,13 @@ struct ModelStats {
   uint64_t materials = 0;
   uint64_t textures = 0;
   uint64_t nodes = 0;
-  std::string upAxis;
-  double metersPerUnit = 0;
+  // Bounds are always in metres, Y-up, whatever the file uses, so every format compares directly.
   float boundsMin[3] = {0, 0, 0};
   float boundsMax[3] = {0, 0, 0};
+  // What the file itself declares. sourceMetersPerUnit is 0 when the format carries no unit (OBJ, STL, PLY...),
+  // in which case metres are assumed.
+  std::string sourceUpAxis;
+  double sourceMetersPerUnit = 0;
 };
 
 struct ProbeInfo {

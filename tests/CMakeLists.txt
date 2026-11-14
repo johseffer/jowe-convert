@@ -14,6 +14,8 @@ set(_jc_test_names
   model_all_writers
   model_units_and_axis
   model_no_textures_and_errors
+  model_usd_color4f_inputs
+  model_fbx_cm_probe_matches_convert
   plugin_load_and_encode
   plugin_abi_rejected)
 

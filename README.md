@@ -38,6 +38,15 @@ What a machine can write is asked at run time: OS codecs and encoder plugins cha
 with their textures, and units / up axis: USD keeps `metersPerUnit` and `upAxis`; glTF output is converted to Y-up
 metres as the glTF spec requires.
 
+3D probe results (and the `input` / `output` probes of a conversion) report bounds in **metres, Y-up** for every
+format, so a centimetre FBX, a Z-up USD and a glTF of the same object give the same numbers. What the file itself
+declares stays visible as `sourceUpAxis` / `sourceMetersPerUnit` (`source_up_axis` / `source_meters_per_unit` in
+JSON and MCP output; `null` when the format has no unit, such as OBJ, STL or PLY, where metres are assumed).
+
+USD written by ModelIO authors UsdPreviewSurface colours (`diffuseColor`, `emissiveColor`, `specularColor`) as
+`color4f` / `float4`. TinyUSDZ only accepts `color3f`, so such files are read again with those inputs rewritten to
+RGB; the alpha is dropped (opacity comes from `inputs:opacity` as usual).
+
 ## Build
 
 Needs CMake 3.25+ and a C++17 compiler. Dependencies are downloaded by CMake (FetchContent) from their official
