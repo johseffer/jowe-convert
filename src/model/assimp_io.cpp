@@ -387,7 +387,8 @@ Result saveAssimp(const Context& ctx, const Scene& scene, const fs::path& path, 
     m->AddProperty(&shininess, 1, AI_MATKEY_SHININESS);
     aiColor3D emissive(sm.emissive[0], sm.emissive[1], sm.emissive[2]);
     m->AddProperty(&emissive, 1, AI_MATKEY_COLOR_EMISSIVE);
-    m->AddProperty(&opacity, 1, AI_MATKEY_OPACITY);
+    // Assimp's glTF exporter multiplies the base colour alpha by this key, so glTF only gets the alpha.
+    if (!gltf) m->AddProperty(&opacity, 1, AI_MATKEY_OPACITY);
     int two = sm.doubleSided ? 1 : 0;
     m->AddProperty(&two, 1, AI_MATKEY_TWOSIDED);
     if (gltf) {
