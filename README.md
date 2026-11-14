@@ -69,6 +69,33 @@ FetchContent_MakeAvailable(jowe_convert)
 target_link_libraries(my_app PRIVATE jowe::convert)
 ```
 
+### Swift Package Manager (iOS, iPadOS, Mac Catalyst, macOS)
+
+Every CI run builds `jowe-convert-apple.xcframework` (static library + headers + module map) with these slices:
+iOS device arm64, iOS simulator arm64 + x86_64, Mac Catalyst arm64 + x86_64 and macOS arm64 + x86_64. It is
+uploaded as the `jowe-convert-apple-xcframework` artefact together with its SwiftPM checksum.
+
+The root `Package.swift` declares it as a `binaryTarget`. Its URL and checksum are placeholders until the first
+release: for a release `vX.Y.Z`, set `releaseTag = "vX.Y.Z"` and `xcframeworkChecksum` to the value the release
+workflow prints (the same as `swift package compute-checksum jowe-convert-apple.xcframework.zip`), then tag.
+
+```swift
+.package(url: "https://github.com/johseffer/jowe-convert.git", exact: "0.1.0"),
+// ...
+.target(name: "MyApp", dependencies: [.product(name: "JoweConvert", package: "jowe-convert")],
+        swiftSettings: [.interoperabilityMode(.Cxx)])
+```
+
+`import JoweConvert` exposes the C++ API (Swift / C++ interop), `import JoweConvertC` the plugin C ABI. The
+`JoweConvert` product also links the system libraries the static library needs (libc++, libz, AudioToolbox,
+CoreFoundation, CoreGraphics, ImageIO).
+
+### Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: it runs the full CI, then attaches the xcframework zip,
+the jvconvert binaries for Windows, macOS, Linux x86_64 / arm64 and wasm, and a `SHA256SUMS` file to the GitHub
+release of that tag.
+
 ## Library
 
 ```cpp

@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -97,4 +98,84 @@ jobs:
         with:
           name: jvconvert-wasm
           path: dist/
+          if-no-files-found: error
+
+  apple-slice:
+    name: apple ${{ matrix.slice }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [ios-arm64, iossim-arm64, iossim-x86_64, catalyst-arm64, catalyst-x86_64, macos-arm64, macos-x86_64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build slice
+        run: apple/build-slice.sh ${{ matrix.slice }} slice/${{ matrix.slice }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apple-slice-${{ matrix.slice }}
+          path: slice/
+          retention-days: 3
+
+  apple-xcframework:
+    name: apple xcframework
+    needs: apple-slice
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: apple-slice-*
+          path: slices
+          merge-multiple: true
+
+      - name: Assemble xcframework
+        run: |
+          set -euo pipefail
+          mkdir -p fat/iossim fat/catalyst fat/macos headers
+          lipo -create slices/iossim-arm64/libjowe_convert.a slices/iossim-x86_64/libjowe_convert.a -output fat/iossim/libjowe_convert.a
+          lipo -create slices/catalyst-arm64/libjowe_convert.a slices/catalyst-x86_64/libjowe_convert.a -output fat/catalyst/libjowe_convert.a
+          lipo -create slices/macos-arm64/libjowe_convert.a slices/macos-x86_64/libjowe_convert.a -output fat/macos/libjowe_convert.a
+          cp -R include/jowe headers/
+          cp apple/module.modulemap headers/module.modulemap
+          xcodebuild -create-xcframework             -library slices/ios-arm64/libjowe_convert.a -headers headers             -library fat/iossim/libjowe_convert.a -headers headers             -library fat/catalyst/libjowe_convert.a -headers headers             -library fat/macos/libjowe_convert.a -headers headers             -output jowe-convert-apple.xcframework
+          plutil -p jowe-convert-apple.xcframework/Info.plist
+          for lib in jowe-convert-apple.xcframework/*/libjowe_convert.a; do echo "$lib: $(lipo -archs "$lib")"; done
+
+      - name: Smoke test (C++ against the macOS slice)
+        run: |
+          set -euo pipefail
+          slice=$(ls -d jowe-convert-apple.xcframework/macos-*)
+          clang++ -std=c++17 apple/smoke/smoke.cpp -I "$slice/Headers" "$slice/libjowe_convert.a"             -lz -framework AudioToolbox -framework CoreFoundation -framework CoreGraphics -framework ImageIO -o smoke
+          mkdir -p smoke-out && ./smoke smoke-out
+
+      - name: Smoke test (SwiftPM binaryTarget, Swift / C++ interop)
+        run: |
+          set -euo pipefail
+          cp -R jowe-convert-apple.xcframework apple/smoke/
+          cd apple/smoke
+          swift build -c release
+          .build/release/Smoke
+          xcodebuild -list
+          xcodebuild build -scheme SmokeLib -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet
+          xcodebuild build -scheme SmokeLib -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO -quiet
+          xcodebuild build -scheme SmokeLib -destination 'generic/platform=macOS,variant=Mac Catalyst' CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Zip and checksum
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent jowe-convert-apple.xcframework jowe-convert-apple.xcframework.zip
+          swift package compute-checksum jowe-convert-apple.xcframework.zip | tee jowe-convert-apple.xcframework.zip.checksum
+          swift package dump-package > /dev/null
+          echo "SwiftPM checksum: $(cat jowe-convert-apple.xcframework.zip.checksum)" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jowe-convert-apple-xcframework
+          path: |
+            jowe-convert-apple.xcframework.zip
+            jowe-convert-apple.xcframework.zip.checksum
           if-no-files-found: error
