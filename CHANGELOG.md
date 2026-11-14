@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - **Linux video re-encoding:** the backend is chosen at run time from VA-API, V4L2 memory-to-memory and Cisco's
   OpenH264 2.6 (loaded with `dlopen` from `JOWE_CONVERT_OPENH264` or `libopenh264.so.8`; never built or linked).
