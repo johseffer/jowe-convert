@@ -323,6 +323,14 @@ jc_video_encoder* encoderCreate(const jc_video_encoder_config* c, char* err, siz
   CFNumberRef br = num(int32_t(c->bitrate_kbps * 1000));
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_AverageBitRate, br);
   CFRelease(br);
+  // AverageBitRate alone is a soft target (short clips overshoot by 15-30%); cap each second as well.
+  CFNumberRef bytes = num(int32_t(c->bitrate_kbps * 1000 / 8)), window = numd(1.0);
+  const void* limits[2] = {bytes, window};
+  CFArrayRef limitArray = CFArrayCreate(nullptr, limits, 2, &kCFTypeArrayCallBacks);
+  VTSessionSetProperty(e->session, kVTCompressionPropertyKey_DataRateLimits, limitArray);
+  CFRelease(limitArray);
+  CFRelease(bytes);
+  CFRelease(window);
   CFNumberRef fps = numd(double(c->fps_num) / c->fps_den);
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_ExpectedFrameRate, fps);
   CFRelease(fps);
