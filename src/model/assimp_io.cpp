@@ -147,9 +147,10 @@ struct Importer {
     if (m->Get(AI_MATKEY_BASE_COLOR, c4) == AI_SUCCESS) out.baseColor = {c4.r, c4.g, c4.b, c4.a};
     else if (m->Get(AI_MATKEY_COLOR_DIFFUSE, c3) == AI_SUCCESS) out.baseColor = {c3.r, c3.g, c3.b, 1.0f};
     float f = 0;
-    // glTF carries opacity in the base colour alpha; other formats in their own opacity key. Never both.
-    if (m->Get(AI_MATKEY_BASE_COLOR, c4) == AI_SUCCESS) out.opacity = std::clamp(c4.a, 0.0f, 1.0f);
-    else if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS && f < 1.0f) out.opacity = std::clamp(f, 0.0f, 1.0f);
+    // glTF puts opacity in the base colour alpha and Assimp may mirror it in the opacity key: take the lower one
+    // instead of multiplying the two.
+    out.opacity = std::clamp(out.baseColor[3], 0.0f, 1.0f);
+    if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS) out.opacity = std::min(out.opacity, std::clamp(f, 0.0f, 1.0f));
     out.baseColor[3] = 1.0f;
     if (m->Get(AI_MATKEY_METALLIC_FACTOR, f) == AI_SUCCESS) out.metallic = f;
     if (m->Get(AI_MATKEY_ROUGHNESS_FACTOR, f) == AI_SUCCESS) out.roughness = f;
