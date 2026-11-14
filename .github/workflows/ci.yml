@@ -159,6 +159,7 @@ jobs:
           cd apple/smoke
           swift build -c release
           .build/release/Smoke
+          xcodebuild -list
           xcodebuild build -scheme SmokeLib -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet
           xcodebuild build -scheme SmokeLib -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO -quiet
           xcodebuild build -scheme SmokeLib -destination 'generic/platform=macOS,variant=Mac Catalyst' CODE_SIGNING_ALLOWED=NO -quiet

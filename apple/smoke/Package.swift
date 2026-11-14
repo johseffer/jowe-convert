@@ -5,6 +5,7 @@ import PackageDescription
 let package = Package(
     name: "Smoke",
     platforms: [.iOS(.v16), .macOS(.v12)],
+    products: [.library(name: "SmokeLib", targets: ["SmokeLib"])],
     targets: [
         .binaryTarget(name: "jowe-convert-apple", path: "jowe-convert-apple.xcframework"),
         .target(
