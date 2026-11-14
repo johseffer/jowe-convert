@@ -19,6 +19,16 @@ Json toJson(const jc::FormatCapability& f) {
   if (!f.writeBackend.empty()) j.set("write_backend", f.writeBackend);
   if (!f.canRead && !f.readReason.empty()) j.set("read_reason", f.readReason);
   if (!f.canWrite && !f.writeReason.empty()) j.set("write_reason", f.writeReason);
+  if (f.kind == jc::MediaKind::Video) {
+    Json t = Json::object();
+    Json enc = Json::array();
+    for (auto& e : f.videoEncoders) enc.push(e);
+    t.set("available", f.canTranscode);
+    if (!f.transcodeBackend.empty()) t.set("backend", f.transcodeBackend);
+    if (!f.canTranscode) t.set("reason", f.transcodeReason);
+    t.set("encoders", enc);
+    j.set("transcode", t);
+  }
   return j;
 }
 
@@ -126,6 +136,47 @@ std::string applyOption(jc::ConvertOptions& o, const std::string& name, const st
       return "scale must be a number";
     }
   }
+  if (name == "video-codec" || name == "video_codec") {
+    if (value == "keep") o.video.codec = jc::VideoOptions::Codec::Keep;
+    else if (value == "h264") o.video.codec = jc::VideoOptions::Codec::H264;
+    else if (value == "hevc" || value == "h265") o.video.codec = jc::VideoOptions::Codec::HEVC;
+    else return "video-codec must be keep, h264 or hevc";
+    return {};
+  }
+  if (name == "resolution") {
+    if (value == "keep") { o.video.maxShortSide = 0; return {}; }
+    int v = 0;
+    try { v = std::stoi(value); } catch (...) {}
+    if (v != 2160 && v != 1080 && v != 720 && v != 480) return "resolution must be keep, 2160, 1080, 720 or 480";
+    o.video.maxShortSide = v;
+    return {};
+  }
+  if (name == "video-bitrate" || name == "video_bitrate_kbps") return toInt(o.video.bitrateKbps, 0, 400000);
+  if (name == "video-quality" || name == "video_quality") {
+    if (value == "auto") o.video.quality = jc::VideoOptions::Quality::Auto;
+    else if (value == "low") o.video.quality = jc::VideoOptions::Quality::Low;
+    else if (value == "medium") o.video.quality = jc::VideoOptions::Quality::Medium;
+    else if (value == "high") o.video.quality = jc::VideoOptions::Quality::High;
+    else return "video-quality must be auto, low, medium or high";
+    return {};
+  }
+  if (name == "max-fps" || name == "max_fps") {
+    try {
+      o.video.maxFrameRate = std::stod(value);
+      if (o.video.maxFrameRate < 0 || o.video.maxFrameRate > 240) return "max-fps must be 0..240";
+      return {};
+    } catch (...) {
+      return "max-fps must be a number";
+    }
+  }
+  if (name == "audio") {
+    if (value == "keep") o.video.audio = jc::VideoOptions::Audio::Keep;
+    else if (value == "aac") o.video.audio = jc::VideoOptions::Audio::Aac;
+    else if (value == "drop") o.video.audio = jc::VideoOptions::Audio::Drop;
+    else return "audio must be keep, aac or drop";
+    return {};
+  }
+  if (name == "audio-bitrate" || name == "audio_bitrate_kbps") return toInt(o.video.audioBitrateKbps, 0, 512);
   if (name == "up-axis" || name == "up_axis") {
     if (value == "keep") o.model.upAxis = jc::ModelOptions::UpAxis::Keep;
     else if (value == "z-to-y" || value == "z_to_y") o.model.upAxis = jc::ModelOptions::UpAxis::ZToY;

@@ -40,6 +40,12 @@ const char* kUsage =
     "  --bitrate <kbps>       AAC / MP3 bitrate\n"
     "  --up-axis <keep|z-to-y|y-to-z>\n"
     "  --scale <factor>       3D scale (e.g. 0.01 for cm to m)\n"
+    "  --video-codec <keep|h264|hevc>  re-encode video (keep = remux unless another video option needs it)\n"
+    "  --resolution <keep|2160|1080|720|480>  cap the video short side, never upscaling\n"
+    "  --video-bitrate <kbps> | --video-quality <auto|low|medium|high>\n"
+    "  --max-fps <fps>        drop frames down to this rate\n"
+    "  --audio <keep|aac|drop>  video soundtrack: copy, re-encode to AAC or remove\n"
+    "  --audio-bitrate <kbps>\n"
     "  --no-textures          drop 3D textures\n"
     "  --no-overwrite         fail if the output exists\n"
     "  --plugin <library>     load an encoder plugin\n"
@@ -228,6 +234,15 @@ int main(int argc, char** argv) {
       std::printf("%-6s %-10s %-14s read:%-3s write:%-3s %s\n", f["kind"].asString().c_str(), f["id"].asString().c_str(),
                   exts.c_str(), f["read"].asBool() ? "yes" : "no", f["write"].asBool() ? "yes" : "no",
                   f["write"].asBool() ? f["write_backend"].asString().c_str() : f["write_reason"].asString().c_str());
+      if (const Json* t = f.find("transcode")) {
+        std::string enc;
+        for (auto& e : (*t)["encoders"].items()) enc += (enc.empty() ? "" : ", ") + e.asString();
+        if ((*t)["available"].asBool())
+          std::printf("%-6s %-10s re-encode: %s (%s)\n", "", "", (*t)["backend"].asString().c_str(),
+                      enc.empty() ? "decode only" : enc.c_str());
+        else
+          std::printf("%-6s %-10s re-encode: no (%s)\n", "", "", (*t)["reason"].asString().c_str());
+      }
     }
     return 0;
   }

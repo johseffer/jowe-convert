@@ -47,6 +47,10 @@ jobs:
           exe=$(find build -name '${{ matrix.exe }}' -type f | head -1)
           "$exe" formats
 
+      - name: Video re-encoding report
+        shell: bash
+        run: ctest --test-dir build -C Release -R video_transcode --verbose 2>&1 | grep -E "Test command|  (target|mp4|mov|backend|not available|60 fps|skipped)|Passed|Failed"
+
       - name: Collect binary
         shell: bash
         run: |
@@ -149,7 +153,8 @@ jobs:
         run: |
           set -euo pipefail
           slice=$(ls -d jowe-convert-apple.xcframework/macos-*)
-          clang++ -std=c++17 apple/smoke/smoke.cpp -I "$slice/Headers" "$slice/libjowe_convert.a"             -lz -framework AudioToolbox -framework CoreFoundation -framework CoreGraphics -framework ImageIO -o smoke
+          clang++ -std=c++17 apple/smoke/smoke.cpp -I "$slice/Headers" "$slice/libjowe_convert.a"             -lz -framework AudioToolbox -framework CoreFoundation -framework CoreGraphics -framework ImageIO \
+            -framework VideoToolbox -framework CoreMedia -framework CoreVideo -o smoke
           mkdir -p smoke-out && ./smoke smoke-out
 
       - name: Smoke test (SwiftPM binaryTarget, Swift / C++ interop)

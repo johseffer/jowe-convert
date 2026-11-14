@@ -79,6 +79,84 @@ typedef struct jc_encoder_plugin {
 typedef const jc_encoder_plugin* const* (*jc_encoder_plugins_fn)(uint32_t host_abi_version, size_t* count);
 #define JC_ENCODER_PLUGINS_SYMBOL "jc_encoder_plugins"
 
+/*
+ * Video codec backends.
+ *
+ * Video transcoding uses the OS codecs. Windows (Media Foundation) and Apple (VideoToolbox) backends are built in;
+ * other hosts (Android MediaCodec, WebCodecs on the web) register a table like this one with
+ * jowe::convert::registerVideoBackend(). The library demuxes, scales, drops frames for a frame-rate cap and muxes;
+ * the backend only decodes compressed samples to frames and encodes frames to compressed samples.
+ *
+ * Rules:
+ *  - Codec names are ISO-BMFF sample entry types: "avc1" (H.264) or "hvc1" (HEVC).
+ *  - Compressed samples, in and out, are MP4-style: NAL units each prefixed by a 4-byte big-endian length.
+ *  - Decoder configuration is the avcC / hvcC record (the box payload, without the box header).
+ *  - Decoders may emit frames in any order; the library reorders them by pts. Encoders must not reorder
+ *    (no B-frames), so a packet's dts equals its pts.
+ *  - Frames are NV12 (8-bit, video range). Width and height are even.
+ *  - Calls are synchronous: every function returns only after its callbacks for the frames / packets it produced
+ *    have run, or holds them for a later push / flush.
+ */
+
+#define JC_VIDEO_BACKEND_ABI_VERSION 1u
+
+enum { JC_PIX_NV12 = 1 };
+
+typedef struct jc_video_frame {
+  uint32_t struct_size;
+  uint32_t format; /* JC_PIX_NV12 */
+  uint32_t width;
+  uint32_t height;
+  const uint8_t* plane[2]; /* Y, interleaved UV */
+  uint32_t stride[2];
+  int64_t pts_us;
+} jc_video_frame;
+
+typedef int32_t (*jc_video_frame_fn)(void* user, const jc_video_frame* frame);
+typedef int32_t (*jc_video_packet_fn)(void* user, const uint8_t* data, size_t size, int64_t pts_us, int64_t dts_us,
+                                      int32_t keyframe);
+
+typedef struct jc_video_encoder_config {
+  uint32_t struct_size;
+  const char* codec; /* "avc1" or "hvc1" */
+  uint32_t width;
+  uint32_t height;
+  uint32_t fps_num;
+  uint32_t fps_den;
+  uint32_t bitrate_kbps;
+  uint32_t keyframe_interval; /* frames */
+} jc_video_encoder_config;
+
+typedef struct jc_video_decoder jc_video_decoder;
+typedef struct jc_video_encoder jc_video_encoder;
+
+typedef struct jc_video_backend {
+  uint32_t abi_version;
+  uint32_t struct_size;
+  const char* name;
+
+  /* 1 when this codec can be decoded / encoded here, else 0 with the reason. */
+  int32_t (*can_decode)(const char* codec, char* reason, size_t reason_size);
+  int32_t (*can_encode)(const char* codec, char* reason, size_t reason_size);
+
+  jc_video_decoder* (*decoder_create)(const char* codec, const uint8_t* config, size_t config_size, uint32_t width,
+                                      uint32_t height, char* err, size_t err_size);
+  int32_t (*decoder_push)(jc_video_decoder* dec, const uint8_t* sample, size_t size, int64_t pts_us,
+                          int32_t keyframe, jc_video_frame_fn on_frame, void* user, char* err, size_t err_size);
+  int32_t (*decoder_flush)(jc_video_decoder* dec, jc_video_frame_fn on_frame, void* user, char* err,
+                           size_t err_size);
+  void (*decoder_destroy)(jc_video_decoder* dec);
+
+  jc_video_encoder* (*encoder_create)(const jc_video_encoder_config* config, char* err, size_t err_size);
+  int32_t (*encoder_push)(jc_video_encoder* enc, const jc_video_frame* frame, jc_video_packet_fn on_packet,
+                          void* user, char* err, size_t err_size);
+  int32_t (*encoder_flush)(jc_video_encoder* enc, jc_video_packet_fn on_packet, void* user, char* err,
+                           size_t err_size);
+  /* The avcC / hvcC payload, available once the first packet was produced. Returns JC_OK when written. */
+  int32_t (*encoder_config)(jc_video_encoder* enc, uint8_t* out, size_t capacity, size_t* size);
+  void (*encoder_destroy)(jc_video_encoder* enc);
+} jc_video_backend;
+
 #ifdef __cplusplus
 }
 #endif

@@ -10,6 +10,7 @@
 #include <vector>
 
 struct jc_encoder_plugin;
+struct jc_video_backend;
 
 namespace jowe::convert {
 
@@ -47,6 +48,12 @@ struct FormatCapability {
   std::string writeBackend;
   std::string readReason;
   std::string writeReason;
+
+  // Video only: re-encoding (as opposed to remuxing), asked at run time.
+  bool canTranscode = false;
+  std::string transcodeBackend;
+  std::string transcodeReason;
+  std::vector<std::string> videoEncoders;  // "h264", "hevc"
 };
 
 // Asked at run time: OS codecs and loaded plugins change the answer.
@@ -117,6 +124,20 @@ struct AudioOptions {
   int bitrateKbps = 0;
 };
 
+struct VideoOptions {
+  // Keep remuxes when nothing else asks for re-encoding; otherwise Keep means H.264.
+  enum class Codec { Keep, H264, HEVC };
+  enum class Quality { Auto, Low, Medium, High };
+  enum class Audio { Keep, Aac, Drop };
+  Codec codec = Codec::Keep;
+  int maxShortSide = 0;    // 0 keeps the size; 2160 / 1080 / 720 / 480 cap the short side, never upscaling
+  int bitrateKbps = 0;     // 0 = from the quality preset
+  Quality quality = Quality::Auto;
+  double maxFrameRate = 0; // 0 keeps the frame rate; otherwise frames are dropped down to this rate
+  Audio audio = Audio::Keep;
+  int audioBitrateKbps = 0;
+};
+
 struct ModelOptions {
   // Keep honours the source's declared axis; the others rotate the model as asked.
   enum class UpAxis { Keep, ZToY, YToZ };
@@ -130,6 +151,7 @@ struct ConvertOptions {
   ImageOptions image;
   AudioOptions audio;
   ModelOptions model;
+  VideoOptions video;
   bool overwrite = true;
   AccessCheck access;
   std::function<void(double)> progress;
@@ -158,6 +180,9 @@ Result loadPlugin(const std::filesystem::path& library, int* encodersAdded = nul
 int loadPluginsFrom(const std::filesystem::path& directory, std::vector<std::string>* errors = nullptr);
 // For hosts that link an encoder in directly (for example a separate wasm module on the web).
 Result registerEncoderPlugin(const jc_encoder_plugin* plugin, const std::string& source);
+// Video codec backend for hosts without a built-in one (Android MediaCodec, WebCodecs). Registered backends are
+// used only where no built-in backend can do the job.
+Result registerVideoBackend(const jc_video_backend* backend);
 
 struct PluginInfo {
   std::string name;

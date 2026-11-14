@@ -590,6 +590,19 @@ Bytes buildMoov(const Movie& mv, const std::vector<Chunk>& chunks, const std::ve
 
 bool writeMovie(const Movie& mv, std::istream& src, std::ostream& out, const MuxOptions& opt, std::string& err,
                 const std::function<bool(double)>& progress) {
+  std::vector<std::istream*> sources{&src};
+  Movie single = mv;
+  for (auto& t : single.tracks) t.source = 0;
+  return writeMovie(single, sources, out, opt, err, progress);
+}
+
+bool writeMovie(const Movie& mv, const std::vector<std::istream*>& sources, std::ostream& out, const MuxOptions& opt,
+                std::string& err, const std::function<bool(double)>& progress) {
+  for (auto& t : mv.tracks)
+    if (t.source < 0 || size_t(t.source) >= sources.size() || !sources[size_t(t.source)]) {
+      err = "a track refers to a missing source";
+      return false;
+    }
   std::vector<Chunk> chunks;
   uint64_t payload = 0;
   for (size_t ti = 0; ti < mv.tracks.size(); ++ti) {
@@ -660,6 +673,7 @@ bool writeMovie(const Movie& mv, std::istream& src, std::ostream& out, const Mux
   uint64_t done = 0;
   for (auto& c : chunks) {
     const auto& t = mv.tracks[c.track];
+    std::istream& src = *sources[size_t(t.source)];
     for (size_t k = 0; k < c.count; ++k) {
       const auto& s = t.samples[c.first + k];
       buf.resize(s.size);

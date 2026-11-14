@@ -144,12 +144,31 @@ Json toolList() {
     props.set("scale", prop("number", "3D scale factor, e.g. 0.01 for centimetres to metres"));
     props.set("textures", prop("boolean", "Keep 3D textures (default true)"));
     props.set("overwrite", prop("boolean", "Replace an existing output (default true)"));
+    auto enumProp = [&](const char* type, const char* desc, std::initializer_list<const char*> values) {
+      Json p = prop(type, desc);
+      Json e = Json::array();
+      for (auto* v : values) e.push(v);
+      p.set("enum", e);
+      return p;
+    };
+    props.set("video_codec", enumProp("string", "Video codec; keep remuxes unless another video option needs re-encoding",
+                                      {"keep", "h264", "hevc"}));
+    props.set("resolution", enumProp("string", "Cap the video's short side (never upscales)",
+                                     {"keep", "2160", "1080", "720", "480"}));
+    props.set("video_bitrate_kbps", prop("integer", "Target video bitrate"));
+    props.set("video_quality", enumProp("string", "Bitrate preset when no bitrate is given",
+                                        {"auto", "low", "medium", "high"}));
+    props.set("max_fps", prop("number", "Drop frames down to this frame rate"));
+    props.set("audio", enumProp("string", "Video soundtrack: copy it, re-encode it to AAC, or remove it",
+                                {"keep", "aac", "drop"}));
+    props.set("audio_bitrate_kbps", prop("integer", "AAC bitrate when the soundtrack is re-encoded"));
     Json t = Json::object();
     t.set("name", "convert")
         .set("title", "Convert a media file")
         .set("description",
              "Converts an image, audio, video or 3D file to another format of the same kind. Video is remuxed "
-             "between MP4 and MOV without re-encoding. Returns the probe of the input and the output.")
+             "between MP4 and MOV, or re-encoded with the OS encoder when a video option asks for it (see "
+             "list_formats: transcode). Returns the probe of the input and the output.")
         .set("inputSchema", schema(props, {"input", "output"}));
     Json ann = Json::object();
     ann.set("readOnlyHint", false).set("destructiveHint", true).set("idempotentHint", true).set("openWorldHint", false);
