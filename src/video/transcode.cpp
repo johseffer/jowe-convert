@@ -65,6 +65,51 @@ void scaleNv12(const jc_video_frame& f, uint32_t dw, uint32_t dh, Frame& out) {
     }
 }
 
+// Rotation (clockwise degrees) a track matrix applies, or 0 when it is not a plain quarter turn.
+int matrixRotation(const uint8_t* m) {
+  auto at = [&](int i) {
+    return int32_t(uint32_t(m[i * 4]) << 24 | uint32_t(m[i * 4 + 1]) << 16 | uint32_t(m[i * 4 + 2]) << 8 | m[i * 4 + 3]);
+  };
+  const int32_t a = at(0), b = at(1), c = at(3), d = at(4);
+  const int32_t one = 0x10000;
+  if (a == 0 && b == one && c == -one && d == 0) return 90;
+  if (a == -one && b == 0 && c == 0 && d == -one) return 180;
+  if (a == 0 && b == -one && c == one && d == 0) return 270;
+  return 0;
+}
+
+void rotateNv12(Frame& f, int degrees) {
+  if (degrees != 90 && degrees != 180 && degrees != 270) return;
+  const uint32_t w = f.width, h = f.height;
+  const bool swap = degrees != 180;
+  const uint32_t nw = swap ? h : w, nh = swap ? w : h;
+  std::vector<uint8_t> y(f.y.size()), uv(f.uv.size());
+  auto map = [&](uint32_t x, uint32_t yy, uint32_t W, uint32_t H, uint32_t& dx, uint32_t& dy) {
+    if (degrees == 90) { dx = H - 1 - yy; dy = x; }
+    else if (degrees == 180) { dx = W - 1 - x; dy = H - 1 - yy; }
+    else { dx = yy; dy = W - 1 - x; }
+  };
+  for (uint32_t r = 0; r < h; ++r)
+    for (uint32_t c = 0; c < w; ++c) {
+      uint32_t dx, dy;
+      map(c, r, w, h, dx, dy);
+      y[size_t(dy) * nw + dx] = f.y[size_t(r) * w + c];
+    }
+  const uint32_t cw = w / 2, ch = h / 2, ncw = nw / 2;
+  for (uint32_t r = 0; r < ch; ++r)
+    for (uint32_t c = 0; c < cw; ++c) {
+      uint32_t dx, dy;
+      map(c, r, cw, ch, dx, dy);
+      uv[size_t(dy) * nw + dx * 2] = f.uv[size_t(r) * w + c * 2];
+      uv[size_t(dy) * nw + dx * 2 + 1] = f.uv[size_t(r) * w + c * 2 + 1];
+    }
+  (void)ncw;
+  f.y.swap(y);
+  f.uv.swap(uv);
+  f.width = nw;
+  f.height = nh;
+}
+
 jc_video_frame view(const Frame& f) {
   jc_video_frame v{};
   v.struct_size = sizeof v;
@@ -90,10 +135,16 @@ struct EncodeSink {
   uint64_t written = 0;
   std::vector<EncodedSample> samples;
   bool ok = true;
+  uint64_t budget = UINT64_MAX;
+  bool overBudget = false;
 };
 
 int32_t onPacket(void* user, const uint8_t* data, size_t size, int64_t pts, int64_t dts, int32_t key) {
   auto* s = static_cast<EncodeSink*>(user);
+  if (s->written + size > s->budget) {
+    s->overBudget = true;
+    return JC_ERR_FAILED;
+  }
   s->file->write(reinterpret_cast<const char*>(data), std::streamsize(size));
   if (!*s->file) {
     s->ok = false;
@@ -119,7 +170,14 @@ bool buildVideoTrack(const jc_video_backend* b, jc_video_encoder* enc, const std
     err = "the encoder produced no samples";
     return false;
   }
-  std::stable_sort(samples.begin(), samples.end(), [](const EncodedSample& a, const EncodedSample& b2) { return a.dts < b2.dts; });
+  // Packets arrive in decode order. Backends disagree on what they report as dts when frames are reordered, so
+  // decode times are rebuilt from the presentation times: the i-th packet decodes at the i-th earliest pts.
+  // Reordered frames then get negative composition offsets (written as ctts version 1).
+  std::vector<int64_t> order;
+  order.reserve(samples.size());
+  for (auto& s : samples) order.push_back(s.pts);
+  std::sort(order.begin(), order.end());
+  for (size_t i = 0; i < samples.size(); ++i) samples[i].dts = order[i];
   const int64_t base = samples.front().dts;
   auto ticks = [&](int64_t us) { return int64_t(std::llround(double(us - base) * timescale / 1e6)); };
   t = MovieTrack();
@@ -168,7 +226,8 @@ fs::path tempBeside(const fs::path& out, const char* suffix) {
 uint32_t evenDown(double v) { return std::max<uint32_t>(2, uint32_t(v) & ~1u); }
 
 // Encodes pcm to AAC in a temporary M4A and returns its audio track (samples read from that file).
-Result aacTrack(const Context& ctx, Pcm& pcm, int kbps, const fs::path& tmp, MovieTrack& track) {
+Result aacTrack(const Context& ctx, Pcm& pcm, int kbps, const fs::path& tmp, uint32_t movieTimescale,
+                MovieTrack& track) {
   std::string reason;
   if (!osAudioCanEncode("m4a", &reason)) return Result::error(Status::Unsupported, reason);
   int rate = pcm.sampleRate, channels = pcm.channels;
@@ -183,7 +242,7 @@ Result aacTrack(const Context& ctx, Pcm& pcm, int kbps, const fs::path& tmp, Mov
   for (auto& t : m.tracks)
     if (t.handler == "soun") {
       track = t;
-      track.edts.clear();
+      track.edts = t.edts.empty() ? Bytes() : rescaleEdts(t.edts, m.timescale, movieTimescale);
       return Result::ok();
     }
   return Result::error(Status::Failed, "the AAC encoder wrote no audio track");
@@ -255,6 +314,9 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
   const uint32_t shortSide = std::min(srcW, srcH);
   if (opt.maxShortSide > 0 && shortSide > uint32_t(opt.maxShortSide)) scale = double(opt.maxShortSide) / shortSide;
   const uint32_t dstW = evenDown(std::lround(srcW * scale)), dstH = evenDown(std::lround(srcH * scale));
+  const int rotation = opt.bakeRotation ? matrixRotation(video->matrix) : 0;
+  const bool swapAxes = rotation == 90 || rotation == 270;
+  const uint32_t encW = swapAxes ? dstH : dstW, encH = swapAxes ? dstW : dstH;
 
   const double srcFps = nominalFrameRate(*video);
   double fps = srcFps > 0 ? srcFps : 30.0;
@@ -275,8 +337,8 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
   char err[512] = {0};
   jc_video_decoder* dec = b->decoder_create(inCodec.c_str(), config.data(), config.size(), srcW, srcH, err, sizeof err);
   if (!dec) return Result::error(Status::Failed, std::string("Video decoder: ") + err);
-  jc_video_encoder_config ec{sizeof ec, outCodec.c_str(), dstW, dstH, fpsNum, fpsDen, uint32_t(kbps),
-                             uint32_t(std::max(1.0, std::round(fps * 2)))};
+  jc_video_encoder_config ec{sizeof ec, outCodec.c_str(), encW, encH, fpsNum, fpsDen, uint32_t(kbps),
+                             uint32_t(std::max(1.0, std::round(fps * 2))), 0};
   jc_video_encoder* enc = b->encoder_create(&ec, err, sizeof err);
   if (!enc) {
     b->decoder_destroy(dec);
@@ -297,6 +359,11 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
   std::ofstream vfile(tmpVideo.path, std::ios::binary | std::ios::trunc);
   if (!vfile) return Result::error(Status::Failed, "Cannot create a temporary file next to the output");
   EncodeSink sink{&vfile};
+  // A broken timeline (or encoder) must not fill the disk: allow four times the bitrate budget of the source's
+  // duration, plus slack for very short clips.
+  const double srcSeconds = video->timescale ? double(video->durationTicks()) / video->timescale : 0;
+  sink.budget = uint64_t((srcSeconds + 1.0) * kbps * 1000.0 / 8.0 * 4.0) + (16ull << 20);
+  const int64_t maxPtsUs = int64_t((srcSeconds + 5.0) * 1e6);
 
   struct Pipeline {
     const jc_video_backend* b;
@@ -312,8 +379,15 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
     uint64_t framesIn = 0, framesOut = 0;
     char* err;
     size_t errSize;
+    int rotation = 0;
+    int64_t maxPts = INT64_MAX;
+    bool timelineBroken = false;
     int32_t emit(Frame& f) {
       if (firstPts == INT64_MIN) firstPts = f.pts;
+      if (f.pts - firstPts > maxPts || f.pts < firstPts - maxPts) {
+        timelineBroken = true;
+        return JC_ERR_FAILED;
+      }
       if (capFps) {
         if (nextAllowed != INT64_MIN && f.pts + 1000 < nextAllowed) return JC_OK;
         const int64_t gap = int64_t(minGapUs);
@@ -322,6 +396,7 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
       }
       lastKeptPts = f.pts;
       ++framesOut;
+      rotateNv12(f, rotation);
       jc_video_frame v = view(f);
       v.pts_us = f.pts - firstPts;
       return b->encoder_push(enc, &v, onPacket, sink, err, errSize);
@@ -335,7 +410,16 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
       }
       return JC_OK;
     }
-  } pipe{b, enc, &sink, dstW, dstH, {}, capFps, 1e6 / fps, INT64_MIN, INT64_MIN, 0, 0, 0, err, sizeof err};
+  } pipe{b, enc, &sink, dstW, dstH, {}, capFps, 1e6 / fps, INT64_MIN, INT64_MIN, 0, 0, 0, err, sizeof err,
+          rotation, maxPtsUs, false};
+  auto overrun = [&]() -> Result {
+    if (sink.overBudget)
+      return Result::error(Status::Failed, "Re-encode stopped: the output grew past " +
+                                               std::to_string(sink.budget >> 20) + " MB, far beyond the source's length");
+    if (pipe.timelineBroken)
+      return Result::error(Status::Failed, "Re-encode stopped: a frame's time lies far outside the source's duration");
+    return Result::ok();
+  };
 
   auto onFrame = [](void* user, const jc_video_frame* f) -> int32_t {
     auto* p = static_cast<Pipeline*>(user);
@@ -362,12 +446,17 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
     const int64_t ptsUs = int64_t(std::llround((double(s.dts) + s.cto) * 1e6 / video->timescale));
     int32_t rc = b->decoder_push(dec, reinterpret_cast<const uint8_t*>(buf.data()), buf.size(), ptsUs, s.sync ? 1 : 0,
                                  onFrame, &pipe, err, sizeof err);
-    if (rc != JC_OK) return Result::error(Status::Failed, std::string("Video: ") + err);
+    if (rc != JC_OK) {
+      if (auto r = overrun(); !r) return r;
+      return Result::error(Status::Failed, std::string("Video: ") + err);
+    }
     ctx.progress(0.02 + 0.83 * double(i + 1) / double(n));
   }
   if (b->decoder_flush(dec, onFrame, &pipe, err, sizeof err) != JC_OK || pipe.drain(0) != JC_OK ||
-      b->encoder_flush(enc, onPacket, &sink, err, sizeof err) != JC_OK)
+      b->encoder_flush(enc, onPacket, &sink, err, sizeof err) != JC_OK) {
+    if (auto r = overrun(); !r) return r;
     return Result::error(Status::Failed, std::string("Video: ") + err);
+  }
   vfile.close();
   if (!sink.ok || !vfile) return Result::error(Status::Failed, "Cannot write the temporary video");
   if (ctx.cancelled()) return Result::error(Status::Cancelled, "Cancelled");
@@ -379,9 +468,9 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
   std::memcpy(mv.matrix, src.matrix, sizeof mv.matrix);
   MovieTrack vt;
   std::string e2;
-  if (!buildVideoTrack(b, enc, outCodec, dstW, dstH, sink.samples, lastDur, timescale, vt, e2))
+  if (!buildVideoTrack(b, enc, outCodec, encW, encH, sink.samples, lastDur, timescale, vt, e2))
     return Result::error(Status::Failed, "Video: " + e2);
-  std::memcpy(vt.matrix, video->matrix, sizeof vt.matrix);
+  if (rotation == 0) std::memcpy(vt.matrix, video->matrix, sizeof vt.matrix);
   vt.language = video->language;
   vt.source = 1;
   mv.tracks.push_back(vt);
@@ -393,7 +482,6 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
     MovieTrack at = *audio;
     at.id = 2;
     at.source = 0;
-    at.edts.clear();
     mv.tracks.push_back(at);
   } else if (audio && opt.audio == VideoOptions::Audio::Aac) {
     Pcm pcm;
@@ -402,7 +490,7 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
       return Result::error(Status::Unsupported, "The audio can't be decoded for AAC re-encoding: " + aerr);
     tmpAudio.path = tempBeside(out, ".jvaudio.m4a");
     MovieTrack at;
-    if (auto r = aacTrack(ctx, pcm, ctx.options->video.audioBitrateKbps, tmpAudio.path, at); !r) return r;
+    if (auto r = aacTrack(ctx, pcm, ctx.options->video.audioBitrateKbps, tmpAudio.path, mv.timescale, at); !r) return r;
     at.id = 2;
     at.source = 2;
     mv.tracks.push_back(at);
@@ -435,13 +523,13 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
 }
 
 Result writeSyntheticClip(const fs::path& out, int width, int height, int fps, int frames, bool withAudio,
-                          const std::string& codec, int bitrateKbps, int noise) {
+                          const std::string& codec, int bitrateKbps, int noise, int bFrames) {
   std::string reason;
   const jc_video_backend* b = pickVideoBackend("", codec, &reason);
   if (!b) return Result::error(Status::Unsupported, reason);
   char err[512] = {0};
   jc_video_encoder_config ec{sizeof ec, codec.c_str(), uint32_t(width), uint32_t(height), uint32_t(fps), 1,
-                             uint32_t(bitrateKbps), uint32_t(fps)};
+                             uint32_t(bitrateKbps), uint32_t(fps), uint32_t(std::max(0, bFrames))};
   jc_video_encoder* enc = b->encoder_create(&ec, err, sizeof err);
   if (!enc) return Result::error(Status::Failed, err);
   struct G {
@@ -505,7 +593,7 @@ Result writeSyntheticClip(const fs::path& out, int width, int height, int fps, i
     ConvertOptions co;
     ctx.options = &co;
     MovieTrack at;
-    if (auto r = aacTrack(ctx, pcm, 128, tmpAudio.path, at); !r) return r;
+    if (auto r = aacTrack(ctx, pcm, 128, tmpAudio.path, mv.timescale, at); !r) return r;
     at.id = 2;
     at.source = 2;
     mv.tracks.push_back(at);

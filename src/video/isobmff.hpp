@@ -56,6 +56,16 @@ struct Movie {
   std::vector<MovieTrack> tracks;
 };
 
+struct EditEntry {
+  uint64_t segmentDuration = 0;  // movie timescale
+  int64_t mediaTime = 0;         // media timescale; -1 = empty edit
+  int16_t rate = 1;
+};
+bool parseEdts(const Bytes& edts, std::vector<EditEntry>& out);
+Bytes buildEdts(const std::vector<EditEntry>& entries);
+// Edit segment durations are in movie time; this converts them when a track moves to another movie.
+Bytes rescaleEdts(const Bytes& edts, uint32_t fromMovieTimescale, uint32_t toMovieTimescale);
+
 // Parses a whole file held in memory (used for small files and probing).
 bool parseMovie(const Bytes& file, Movie& movie, std::string& err);
 // Parses a file on disk, loading only ftyp and moov into memory.

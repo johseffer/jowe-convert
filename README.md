@@ -38,6 +38,20 @@ What a machine can write is asked at run time: OS codecs and encoder plugins cha
 with their textures, and units / up axis: USD keeps `metersPerUnit` and `upAxis`; glTF output is converted to Y-up
 metres as the glTF spec requires.
 
+### Units
+
+What is **written** (unchanged since 0.1.0):
+
+| Output | Geometry | Unit / axis metadata |
+|---|---|---|
+| glTF, GLB | converted to metres, Y-up: scaled by the source's metres-per-unit when the source declares one, rotated when it is Z-up or X-up | none (glTF is metres, Y-up by definition) |
+| USD, USDA, USDZ | the source's own numbers | `metersPerUnit` and `upAxis` copied from the source (FBX in centimetres → `metersPerUnit = 0.01`) |
+| OBJ, STL, PLY | the source's own numbers (an FBX in centimetres stays in centimetres) | none |
+
+`--scale` and `--up-axis` apply on top. FBX units come from Assimp's `UnitScaleFactor` (centimetres per unit):
+metres per unit = `UnitScaleFactor / 100`. OBJ, STL and PLY carry no unit and are taken as metres.
+
+What is **reported** changed in 0.1.1:
 3D probe results (and the `input` / `output` probes of a conversion) report bounds in **metres, Y-up** for every
 format, so a centimetre FBX, a Z-up USD and a glTF of the same object give the same numbers. What the file itself
 declares stays visible as `sourceUpAxis` / `sourceMetersPerUnit` (`source_up_axis` / `source_meters_per_unit` in
@@ -190,7 +204,8 @@ MP4 / MOV / M4V are remuxed (no quality loss) unless a video option asks for re-
 | Resolution | `--resolution` | `resolution` | `keep`, `2160`, `1080`, `720`, `480` (short side, never upscales) |
 | Bitrate | `--video-bitrate` / `--video-quality` | `video_bitrate_kbps` / `video_quality` | kbit/s, or `low` / `medium` / `high` (0.05 / 0.10 / 0.16 bit per pixel per frame, HEVC 0.6×) |
 | Frame rate | `--max-fps` | `max_fps` | frames are dropped down to this rate |
-| Soundtrack | `--audio` | `audio` | `keep` (copied), `aac` (re-encoded with the OS encoder), `drop` |
+| Soundtrack | `--audio` | `audio` | `keep` (copied with its edit list / AAC priming), `aac` (re-encoded with the OS encoder), `drop` |
+| Rotation | `--rotation` | `rotation` | `bake` (default: pixels rotated upright, identity matrix) or `metadata` (source matrix kept); a remux always keeps the matrix |
 
 The library demuxes the source, decodes with the OS decoder, scales (box filter) and drops frames itself, encodes
 with the OS encoder (constant bitrate, no B-frames, a keyframe every 2 s) and writes the result with its own
@@ -228,8 +243,7 @@ writer, WAV / AIFF / CAF, the TIFF codec and the resampler. Nothing GPL or LGPL 
 ## Status (v0.1)
 
 - Video re-encoding needs an OS codec: Media Foundation (Windows) or VideoToolbox (macOS / iOS). Linux reports it
-  as unsupported; Android and the web need a host backend (see below). The rotation of the source is kept as a
-  track matrix rather than baked into the pixels.
+  as unsupported; Android and the web need a host backend (see below).
 - Audio and images are decoded whole in memory; very long recordings need RAM accordingly.
 - HEIC read needs an OS decoder (Windows with the HEIF and HEVC extensions, macOS); Linux and wasm report it as
   unsupported. HEIC images above ~35 megapixels are refused (no grid tiling yet).

@@ -17,6 +17,11 @@ set(_jc_test_names
   video_transcode_frame_rate_cap
   video_transcode_hevc
   video_transcode_cancel
+  core_version_single_source
+  video_ctts_signed_offsets
+  video_transcode_bframes_ctts
+  video_transcode_audio_edit_list
+  video_transcode_rotation
   model_obj_usdz_glb_roundtrip
   model_all_writers
   model_units_and_axis
@@ -33,12 +38,14 @@ add_executable(jc_tests
   test_audio.cpp
   test_video.cpp
   test_transcode.cpp
+  test_regressions.cpp
   test_model.cpp
   test_plugin.cpp)
 target_include_directories(jc_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(jc_tests PRIVATE jowe::convert)
 target_compile_definitions(jc_tests PRIVATE JC_MINIMP3_VECTORS="${minimp3_SOURCE_DIR}/vectors"
-  JC_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+  JC_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+  JC_PROJECT_VERSION="${PROJECT_VERSION}")
 if(JOWE_CONVERT_WITH_OS_CODECS AND (WIN32 OR APPLE) AND NOT EMSCRIPTEN)
   target_compile_definitions(jc_tests PRIVATE JC_EXPECT_VIDEO_ENCODER)
 endif()
@@ -74,6 +81,7 @@ if(TARGET jvconvert)
       -DJVCONVERT=$<TARGET_FILE:jvconvert>
       "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}"
       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/cli_smoke
+      -DVERSION=${PROJECT_VERSION}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_smoke.cmake)
 endif()
 

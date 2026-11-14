@@ -125,6 +125,9 @@ typedef struct jc_video_encoder_config {
   uint32_t fps_den;
   uint32_t bitrate_kbps;
   uint32_t keyframe_interval; /* frames */
+  /* Present when struct_size covers it. The library leaves it 0 (no B-frames); it is only raised to make test
+     fixtures with reordered frames. */
+  uint32_t max_b_frames;
 } jc_video_encoder_config;
 
 typedef struct jc_video_decoder jc_video_decoder;

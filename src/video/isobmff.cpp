@@ -106,7 +106,10 @@ bool parseStbl(const uint8_t* p, const BoxRef& stbl, MovieTrack& t, std::string&
         uint32_t c = r.be32();
         uint32_t v = r.be32();
         cttsRuns.emplace_back(c, v);
-        cttsOffsets.push_back(version == 1 ? int32_t(v) : int32_t(std::min<uint32_t>(v, 0x7fffffff)));
+        // Version 1 is signed by definition; version 0 is unsigned on paper, but writers put negative offsets
+        // there too, so a value with the top bit set is read as negative either way.
+        (void)version;
+        cttsOffsets.push_back(int32_t(v));
       }
     } else if (b.type == "stsc") {
       r.be32();
@@ -289,6 +292,67 @@ void parseFtyp(const uint8_t* p, const BoxRef& b, Movie& mv) {
 }
 
 }  // namespace
+
+bool parseEdts(const Bytes& edts, std::vector<EditEntry>& out) {
+  out.clear();
+  BoxRef e;
+  if (!readBox(edts.data(), 0, edts.size(), e) || e.type != "edts") return false;
+  bool found = false;
+  eachChild(edts.data(), e.payload, e.end, [&](const BoxRef& b) {
+    if (b.type != "elst" || found) return;
+    found = true;
+    ByteReader r(edts.data(), b.end);
+    r.seek(b.payload);
+    const uint8_t v = r.u8();
+    r.be24();
+    const uint32_t n = r.be32();
+    for (uint32_t i = 0; i < n && r.ok(); ++i) {
+      EditEntry x;
+      x.segmentDuration = v == 1 ? r.be64() : r.be32();
+      x.mediaTime = v == 1 ? int64_t(r.be64()) : int64_t(int32_t(r.be32()));
+      x.rate = int16_t(r.be16());
+      r.be16();
+      if (r.ok()) out.push_back(x);
+    }
+  });
+  return found;
+}
+
+Bytes buildEdts(const std::vector<EditEntry>& entries) {
+  bool v1 = false;
+  for (auto& x : entries)
+    v1 = v1 || x.segmentDuration > 0xFFFFFFFFull || x.mediaTime > INT32_MAX || x.mediaTime < INT32_MIN;
+  ByteWriter w;
+  w.be32(0);
+  w.fourcc("edts");
+  w.be32(0);
+  w.fourcc("elst");
+  w.u8(v1 ? 1 : 0);
+  w.be24(0);
+  w.be32(uint32_t(entries.size()));
+  for (auto& x : entries) {
+    if (v1) {
+      w.be64(x.segmentDuration);
+      w.be64(uint64_t(x.mediaTime));
+    } else {
+      w.be32(uint32_t(x.segmentDuration));
+      w.be32(uint32_t(int32_t(x.mediaTime)));
+    }
+    w.be16(uint16_t(x.rate));
+    w.be16(0);
+  }
+  w.patchBe32(8, uint32_t(w.size() - 8));
+  w.patchBe32(0, uint32_t(w.size()));
+  return std::move(w.data);
+}
+
+Bytes rescaleEdts(const Bytes& edts, uint32_t fromMovieTimescale, uint32_t toMovieTimescale) {
+  std::vector<EditEntry> e;
+  if (!parseEdts(edts, e) || !fromMovieTimescale || !toMovieTimescale) return {};
+  for (auto& x : e)
+    x.segmentDuration = uint64_t(double(x.segmentDuration) * toMovieTimescale / fromMovieTimescale + 0.5);
+  return buildEdts(e);
+}
 
 uint64_t MovieTrack::durationTicks() const {
   if (samples.empty()) return mediaDuration;

@@ -7,6 +7,7 @@
 #include <CoreVideo/CoreVideo.h>
 #include <VideoToolbox/VideoToolbox.h>
 
+#include <cstddef>
 #include <cstdio>
 #include <map>
 #include <memory>
@@ -317,7 +318,10 @@ jc_video_encoder* encoderCreate(const jc_video_encoder_config* c, char* err, siz
     return nullptr;
   }
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_RealTime, kCFBooleanFalse);
-  VTSessionSetProperty(e->session, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
+  const bool reorder = c->struct_size >= offsetof(jc_video_encoder_config, max_b_frames) + sizeof(uint32_t) &&
+                       c->max_b_frames > 0;
+  VTSessionSetProperty(e->session, kVTCompressionPropertyKey_AllowFrameReordering,
+                       reorder ? kCFBooleanTrue : kCFBooleanFalse);
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_ProfileLevel,
                        e->hevc ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel);
   CFNumberRef br = num(int32_t(c->bitrate_kbps * 1000));

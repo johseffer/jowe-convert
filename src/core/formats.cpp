@@ -190,7 +190,7 @@ std::optional<FormatCapability> formatForPath(const std::filesystem::path& path)
   return findFormat(ext);
 }
 
-const char* version() { return "0.1.0"; }
+const char* version() { return JOWE_CONVERT_VERSION; }
 
 const char* toString(Status s) {
   switch (s) {

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(jowe_convert
-  VERSION 0.1.0
+  VERSION 0.2.1
   DESCRIPTION "Convert images, audio, video and 3D on any OS"
   HOMEPAGE_URL "https://github.com/johseffer/jowe-convert"
   LANGUAGES C CXX)

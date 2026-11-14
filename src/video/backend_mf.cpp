@@ -15,6 +15,7 @@
 #include <codecapi.h>
 #include <wrl/client.h>
 
+#include <cstddef>
 #include <cstdio>
 #include <memory>
 #include <mutex>
@@ -377,7 +378,8 @@ jc_video_encoder* encoderCreate(const jc_video_encoder_config* c, char* err, siz
   const UINT32 bps = c->bitrate_kbps * 1000;
   setCodecApi(e->mft.Get(), CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR);
   setCodecApi(e->mft.Get(), CODECAPI_AVEncCommonMeanBitRate, bps);
-  setCodecApi(e->mft.Get(), CODECAPI_AVEncMPVDefaultBPictureCount, 0);
+  const bool hasB = c->struct_size >= offsetof(jc_video_encoder_config, max_b_frames) + sizeof(uint32_t);
+  setCodecApi(e->mft.Get(), CODECAPI_AVEncMPVDefaultBPictureCount, hasB ? c->max_b_frames : 0);
   if (c->keyframe_interval) setCodecApi(e->mft.Get(), CODECAPI_AVEncMPVGOPSize, c->keyframe_interval);
 
   ComPtr<IMFMediaType> out;

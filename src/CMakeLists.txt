@@ -49,7 +49,8 @@ target_link_libraries(jowe_convert
     minimp3_headers
     jc_stb_headers)
 
-target_compile_definitions(jowe_convert PRIVATE FLAC__NO_DLL)
+# The project version in the top-level CMakeLists.txt is the only place the version is written.
+target_compile_definitions(jowe_convert PRIVATE FLAC__NO_DLL JOWE_CONVERT_VERSION="${PROJECT_VERSION}")
 
 if(JOWE_CONVERT_WITH_HEIC_ENCODER)
   target_link_libraries(jowe_convert PRIVATE kvazaar)

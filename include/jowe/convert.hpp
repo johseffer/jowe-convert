@@ -136,6 +136,9 @@ struct VideoOptions {
   double maxFrameRate = 0; // 0 keeps the frame rate; otherwise frames are dropped down to this rate
   Audio audio = Audio::Keep;
   int audioBitrateKbps = 0;
+  // On re-encode, rotate the pixels upright (true) or keep the source's rotation as track metadata (false).
+  // A remux always keeps the metadata.
+  bool bakeRotation = true;
 };
 
 struct ModelOptions {

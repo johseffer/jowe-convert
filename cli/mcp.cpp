@@ -162,6 +162,9 @@ Json toolList() {
     props.set("audio", enumProp("string", "Video soundtrack: copy it, re-encode it to AAC, or remove it",
                                 {"keep", "aac", "drop"}));
     props.set("audio_bitrate_kbps", prop("integer", "AAC bitrate when the soundtrack is re-encoded"));
+    props.set("rotation", enumProp("string", "On re-encode: rotate the pixels upright (bake, default) or keep the "
+                                             "source's rotation as track metadata",
+                                   {"bake", "metadata"}));
     Json t = Json::object();
     t.set("name", "convert")
         .set("title", "Convert a media file")
