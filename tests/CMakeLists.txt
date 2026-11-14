@@ -16,6 +16,7 @@ set(_jc_test_names
   model_no_textures_and_errors
   model_usd_color4f_inputs
   model_fbx_cm_probe_matches_convert
+  model_modelio_usdc_color4f
   plugin_load_and_encode
   plugin_abi_rejected)
 
@@ -28,7 +29,8 @@ add_executable(jc_tests
   test_plugin.cpp)
 target_include_directories(jc_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(jc_tests PRIVATE jowe::convert)
-target_compile_definitions(jc_tests PRIVATE JC_MINIMP3_VECTORS="${minimp3_SOURCE_DIR}/vectors")
+target_compile_definitions(jc_tests PRIVATE JC_MINIMP3_VECTORS="${minimp3_SOURCE_DIR}/vectors"
+  JC_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 if(MSVC)
   target_compile_options(jc_tests PRIVATE /utf-8 /wd4996)
   target_compile_definitions(jc_tests PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)

@@ -147,8 +147,10 @@ struct Importer {
     if (m->Get(AI_MATKEY_BASE_COLOR, c4) == AI_SUCCESS) out.baseColor = {c4.r, c4.g, c4.b, c4.a};
     else if (m->Get(AI_MATKEY_COLOR_DIFFUSE, c3) == AI_SUCCESS) out.baseColor = {c3.r, c3.g, c3.b, 1.0f};
     float f = 0;
-    if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS && f < 1.0f) out.opacity = std::clamp(f, 0.0f, 1.0f);
-    out.opacity *= out.baseColor[3];
+    // glTF carries opacity in the base colour alpha; other formats in their own opacity key. Never both.
+    if (m->Get(AI_MATKEY_BASE_COLOR, c4) == AI_SUCCESS) out.opacity = std::clamp(c4.a, 0.0f, 1.0f);
+    else if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS && f < 1.0f) out.opacity = std::clamp(f, 0.0f, 1.0f);
+    out.baseColor[3] = 1.0f;
     if (m->Get(AI_MATKEY_METALLIC_FACTOR, f) == AI_SUCCESS) out.metallic = f;
     if (m->Get(AI_MATKEY_ROUGHNESS_FACTOR, f) == AI_SUCCESS) out.roughness = f;
     else if (m->Get(AI_MATKEY_SHININESS, f) == AI_SUCCESS && f > 0) out.roughness = std::sqrt(2.0f / (f + 2.0f));

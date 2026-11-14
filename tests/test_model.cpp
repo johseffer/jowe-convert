@@ -264,3 +264,80 @@ TEST(model_fbx_cm_probe_matches_convert) {
     }
   }
 }
+
+#ifndef JC_FIXTURES
+#define JC_FIXTURES ""
+#endif
+
+namespace {
+
+Scene loadForTest(const fs::path& p) {
+  jc::ConvertOptions opts;
+  Context ctx;
+  ctx.options = &opts;
+  Scene scene;
+  std::string ext = extensionOf(p);
+  Result r = (ext == "usda" || ext == "usdc" || ext == "usdz" || ext == "usd") ? loadUsd(ctx, p, ext, scene)
+                                                                               : loadAssimp(ctx, p, ext, scene);
+  if (!r) {
+    std::fprintf(stderr, "  load %s: %s\n", p.string().c_str(), r.message.c_str());
+    ++g_failures;
+  }
+  return scene;
+}
+
+bool near(float a, float b) { return std::fabs(a - b) < 1e-5f; }
+
+void expectTriMat(const fs::path& p, bool gltf) {
+  Scene s = loadForTest(p);
+  if (s.meshes.empty()) {
+    std::fprintf(stderr, "  %s has no mesh\n", p.string().c_str());
+    ++g_failures;
+    return;
+  }
+  const int mi = s.meshes[0].material;
+  if (mi < 0 || size_t(mi) >= s.materials.size()) {
+    std::fprintf(stderr, "  %s: mesh has no material\n", p.string().c_str());
+    ++g_failures;
+    return;
+  }
+  const SceneMaterial& m = s.materials[size_t(mi)];
+  const bool ok = near(m.baseColor[0], 0.8f) && near(m.baseColor[1], 0.2f) && near(m.baseColor[2], 0.1f) &&
+                  near(m.emissive[0], 0.1f) && near(m.emissive[1], 0.3f) && near(m.emissive[2], 0.9f) &&
+                  near(m.opacity, 0.5f) && (gltf ? m.blend : true);
+  if (!ok) {
+    std::fprintf(stderr, "  %s: base (%g %g %g %g) emissive (%g %g %g) opacity %g blend %d\n", p.string().c_str(),
+                 m.baseColor[0], m.baseColor[1], m.baseColor[2], m.baseColor[3], m.emissive[0], m.emissive[1],
+                 m.emissive[2], m.opacity, int(m.blend));
+    ++g_failures;
+  }
+  CHECK(s.meshes.size() == 1);
+  CHECK(s.meshes[0].indices.size() == 3);
+}
+
+}  // namespace
+
+TEST(model_modelio_usdc_color4f) {
+  const fs::path fixtures = JC_FIXTURES;
+  fs::path dir = tempDir() / "modelio";
+  fs::create_directories(dir);
+  for (const char* name : {"modelio_triangle_color4f.usdc", "modelio_triangle_color4f.usda"}) {
+    fs::path src = fixtures / name;
+    REQUIRE(fs::exists(src));
+    auto p = jc::probe(src);
+    REQUIRE(p.result);
+    CHECK(p.info.model.triangles == 1);
+    CHECK(p.info.model.materials == 1);
+    CHECK(near(p.info.model.boundsMax[0], 1.0f) && near(p.info.model.boundsMax[1], 1.0f));
+    expectTriMat(src, false);
+    std::string stem = fs::path(name).extension().string().substr(1);
+    for (const char* ext : {"usda", "glb"}) {
+      fs::path out = dir / (stem + "." + ext);
+      auto rep = jc::convert(src, out);
+      CHECK_OK(rep);
+      if (!rep.result) continue;
+      CHECK(rep.output.model.triangles == 1);
+      expectTriMat(out, std::string(ext) == "glb");
+    }
+  }
+}
