@@ -277,7 +277,7 @@ Scene loadForTest(const fs::path& p) {
   ctx.options = &opts;
   Scene scene;
   std::string ext = extensionOf(p);
-  Result r = (ext == "usda" || ext == "usdc" || ext == "usdz" || ext == "usd") ? loadUsd(ctx, p, ext, scene)
+  jc::Result r = (ext == "usda" || ext == "usdc" || ext == "usdz" || ext == "usd") ? loadUsd(ctx, p, ext, scene)
                                                                                : loadAssimp(ctx, p, ext, scene);
   if (!r) {
     std::fprintf(stderr, "  load %s: %s\n", p.string().c_str(), r.message.c_str());
