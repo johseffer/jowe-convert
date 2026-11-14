@@ -20,6 +20,19 @@ Matrix multiply(const Matrix& a, const Matrix& b) {
   return r;
 }
 
+namespace {
+const Matrix kZToY = {1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1};
+const Matrix kYToZ = {1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1};
+const Matrix kXToY = {0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+Matrix scaleMatrix(double k) { return {k, 0, 0, 0, 0, k, 0, 0, 0, 0, k, 0, 0, 0, 0, 1}; }
+}  // namespace
+
+Matrix toMetresYUp(const Scene& s) {
+  Matrix m = s.upAxis == "Z" ? kZToY : (s.upAxis == "X" ? kXToY : identityMatrix());
+  if (s.unitsKnown && s.metersPerUnit > 0 && s.metersPerUnit != 1.0) m = multiply(m, scaleMatrix(s.metersPerUnit));
+  return m;
+}
+
 ModelStats sceneStats(const Scene& s) {
   ModelStats st;
   st.meshes = s.meshes.size();
@@ -30,8 +43,8 @@ ModelStats sceneStats(const Scene& s) {
   st.materials = s.materials.size();
   st.textures = s.textures.size();
   st.nodes = s.nodes.size();
-  st.upAxis = s.upAxis;
-  st.metersPerUnit = s.unitsKnown ? s.metersPerUnit : 0;
+  st.sourceUpAxis = s.upAxis;
+  st.sourceMetersPerUnit = s.unitsKnown ? s.metersPerUnit : 0;
   bool first = true;
   std::function<void(int, const Matrix&)> walk = [&](int idx, const Matrix& parent) {
     const auto& n = s.nodes[size_t(idx)];
@@ -52,7 +65,7 @@ ModelStats sceneStats(const Scene& s) {
     }
     for (int c : n.children) walk(c, world);
   };
-  if (!s.nodes.empty()) walk(0, identityMatrix());
+  if (!s.nodes.empty()) walk(0, toMetresYUp(s));
   return st;
 }
 
@@ -69,11 +82,6 @@ void applyRoot(Scene& s, const Matrix& t) {
   if (s.nodes.empty()) return;
   s.nodes[0].matrix = multiply(s.nodes[0].matrix, t);
 }
-
-const Matrix kZToY = {1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1};
-const Matrix kYToZ = {1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1};
-
-Matrix scaleMatrix(double k) { return {k, 0, 0, 0, 0, k, 0, 0, 0, 0, k, 0, 0, 0, 0, 1}; }
 
 int channelIndex(const std::string& c) { return c == "g" ? 1 : c == "b" ? 2 : c == "a" ? 3 : 0; }
 
@@ -170,8 +178,7 @@ Result convertModel(const Context& ctx, const fs::path& in, const std::string& i
 
   Result r;
   if (outFormat == "gltf" || outFormat == "glb") {
-    if (scene.upAxis == "Z") applyRoot(scene, kZToY);
-    if (scene.unitsKnown && scene.metersPerUnit != 1.0) applyRoot(scene, scaleMatrix(scene.metersPerUnit));
+    applyRoot(scene, toMetresYUp(scene));
     scene.upAxis = "Y";
     scene.metersPerUnit = 1.0;
     combineMetallicRoughness(ctx, scene);

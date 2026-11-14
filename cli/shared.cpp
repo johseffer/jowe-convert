@@ -63,8 +63,9 @@ Json toJson(const jc::ProbeInfo& p) {
       const auto& m = p.model;
       j.set("meshes", uint64_t(m.meshes)).set("vertices", uint64_t(m.vertices)).set("triangles", uint64_t(m.triangles));
       j.set("materials", uint64_t(m.materials)).set("textures", uint64_t(m.textures)).set("nodes", uint64_t(m.nodes));
-      j.set("up_axis", m.upAxis);
-      if (m.metersPerUnit > 0) j.set("meters_per_unit", m.metersPerUnit);
+      j.set("source_up_axis", m.sourceUpAxis);
+      j.set("source_meters_per_unit", m.sourceMetersPerUnit > 0 ? Json(m.sourceMetersPerUnit) : Json());
+      j.set("bounds_units", "m").set("bounds_up_axis", "Y");
       Json bmin = Json::array(), bmax = Json::array();
       for (int i = 0; i < 3; ++i) {
         bmin.push(double(m.boundsMin[i]));

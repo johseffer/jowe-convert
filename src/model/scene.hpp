@@ -73,6 +73,8 @@ struct Scene {
 };
 
 ModelStats sceneStats(const Scene& s);
+// Root transform that brings the scene to Y-up metres (glTF's convention and the unit of reported bounds).
+Matrix toMetresYUp(const Scene& s);
 
 Result loadAssimp(const Context& ctx, const fs::path& path, const std::string& format, Scene& scene);
 Result saveAssimp(const Context& ctx, const Scene& scene, const fs::path& path, const std::string& format);

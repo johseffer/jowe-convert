@@ -147,8 +147,11 @@ struct Importer {
     if (m->Get(AI_MATKEY_BASE_COLOR, c4) == AI_SUCCESS) out.baseColor = {c4.r, c4.g, c4.b, c4.a};
     else if (m->Get(AI_MATKEY_COLOR_DIFFUSE, c3) == AI_SUCCESS) out.baseColor = {c3.r, c3.g, c3.b, 1.0f};
     float f = 0;
-    if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS && f < 1.0f) out.opacity = std::clamp(f, 0.0f, 1.0f);
-    out.opacity *= out.baseColor[3];
+    // glTF puts opacity in the base colour alpha and Assimp may mirror it in the opacity key: take the lower one
+    // instead of multiplying the two.
+    out.opacity = std::clamp(out.baseColor[3], 0.0f, 1.0f);
+    if (m->Get(AI_MATKEY_OPACITY, f) == AI_SUCCESS) out.opacity = std::min(out.opacity, std::clamp(f, 0.0f, 1.0f));
+    out.baseColor[3] = 1.0f;
     if (m->Get(AI_MATKEY_METALLIC_FACTOR, f) == AI_SUCCESS) out.metallic = f;
     if (m->Get(AI_MATKEY_ROUGHNESS_FACTOR, f) == AI_SUCCESS) out.roughness = f;
     else if (m->Get(AI_MATKEY_SHININESS, f) == AI_SUCCESS && f > 0) out.roughness = std::sqrt(2.0f / (f + 2.0f));
@@ -384,7 +387,8 @@ Result saveAssimp(const Context& ctx, const Scene& scene, const fs::path& path, 
     m->AddProperty(&shininess, 1, AI_MATKEY_SHININESS);
     aiColor3D emissive(sm.emissive[0], sm.emissive[1], sm.emissive[2]);
     m->AddProperty(&emissive, 1, AI_MATKEY_COLOR_EMISSIVE);
-    m->AddProperty(&opacity, 1, AI_MATKEY_OPACITY);
+    // Assimp's glTF exporter multiplies the base colour alpha by this key, so glTF only gets the alpha.
+    if (!gltf) m->AddProperty(&opacity, 1, AI_MATKEY_OPACITY);
     int two = sm.doubleSided ? 1 : 0;
     m->AddProperty(&two, 1, AI_MATKEY_TWOSIDED);
     if (gltf) {
