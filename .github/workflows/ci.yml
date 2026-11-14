@@ -24,8 +24,16 @@ jobs:
         include:
           - { name: windows-x64, os: windows-latest, exe: jvconvert.exe }
           - { name: macos-arm64, os: macos-latest, exe: jvconvert }
-          - { name: linux-x64, os: ubuntu-latest, exe: jvconvert }
-          - { name: linux-arm64, os: ubuntu-24.04-arm, exe: jvconvert }
+          - name: linux-x64
+            os: ubuntu-latest
+            exe: jvconvert
+            openh264: linux64
+            openh264_sha256: 27ab53323c110b76214c1c72222f459d17febbcd1e252136cadc292b0308d75b
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            exe: jvconvert
+            openh264: linux-arm64
+            openh264_sha256: a78aea7970150f46bcd3bb7994c9e6dd90bd7a9ea785920f5a73f6964e3fcda7
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +44,18 @@ jobs:
       - name: Build
         shell: bash
         run: cmake --build build --config Release --parallel 4
+
+      - name: Install Cisco's OpenH264 binary (Linux)
+        if: matrix.openh264 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=libopenh264-2.6.0-${{ matrix.openh264 }}.8.so.bz2
+          curl -sSfL -o "$RUNNER_TEMP/$f" "https://ciscobinary.openh264.org/$f"
+          echo "${{ matrix.openh264_sha256 }}  $RUNNER_TEMP/$f" | sha256sum -c -
+          bunzip2 -c "$RUNNER_TEMP/$f" > "$RUNNER_TEMP/libopenh264.so.8"
+          echo "JOWE_CONVERT_OPENH264=$RUNNER_TEMP/libopenh264.so.8" >> "$GITHUB_ENV"
+          echo "JC_EXPECT_VIDEO_ENCODER=1" >> "$GITHUB_ENV"
 
       - name: Test
         shell: bash

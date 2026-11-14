@@ -22,6 +22,8 @@ set(_jc_test_names
   video_transcode_bframes_ctts
   video_transcode_audio_edit_list
   video_transcode_rotation
+  video_linux_backend_selection
+  video_linux_backend_report
   model_obj_usdz_glb_roundtrip
   model_all_writers
   model_units_and_axis
@@ -39,6 +41,7 @@ add_executable(jc_tests
   test_video.cpp
   test_transcode.cpp
   test_regressions.cpp
+  test_linux_select.cpp
   test_model.cpp
   test_plugin.cpp)
 target_include_directories(jc_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})

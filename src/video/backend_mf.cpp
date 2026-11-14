@@ -495,6 +495,7 @@ const jc_video_backend kMf = {
 
 const jc_video_backend* builtinVideoBackend() { return &kMf; }
 std::string noBuiltinVideoBackendReason() { return {}; }
+std::vector<std::string> videoBackendNotes() { return {}; }
 
 }  // namespace jowe::convert::detail
 

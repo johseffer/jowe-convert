@@ -139,3 +139,30 @@ target_include_directories(jc_stb_headers SYSTEM INTERFACE ${tinyusdz_SOURCE_DIR
 if(JOWE_CONVERT_WITH_HEIC_ENCODER AND TARGET kvazaar)
   target_compile_definitions(kvazaar INTERFACE KVZ_STATIC_LIB)
 endif()
+
+# OpenH264 (BSD-2): only the four API headers of the release that matches Cisco's prebuilt binary. The library
+# itself is never built or linked; libopenh264.so.8 is loaded at run time so users run Cisco's binary.
+if(JOWE_CONVERT_WITH_OPENH264)
+  set(JC_OPENH264_VERSION 2.6.0)
+  set(_jc_oh264_dir ${CMAKE_BINARY_DIR}/_deps/openh264-api)
+  foreach(entry
+      "codec_api.h|21f29b20c24f7c7946f2e243d0bc2532fb3542f6c28af338209477e70d9036c9"
+      "codec_app_def.h|a40581a24263866dca19911928f7bc4eb354ff78d9dd56dbf0f55fc4fd923726"
+      "codec_def.h|f974d269b5935e8dc7265b8bfc02f60e5185b4d6165d30541d2758a4506f1979"
+      "codec_ver.h|9a241e20b7c9221a5786cccd9eae3afed91afba3525b5b9b16c2101976516f94")
+    string(REPLACE "|" ";" _parts "${entry}")
+    list(GET _parts 0 _name)
+    list(GET _parts 1 _hash)
+    file(DOWNLOAD
+      https://raw.githubusercontent.com/cisco/openh264/v${JC_OPENH264_VERSION}/codec/api/wels/${_name}
+      ${_jc_oh264_dir}/wels/${_name}
+      EXPECTED_HASH SHA256=${_hash}
+      STATUS _status)
+    list(GET _status 0 _code)
+    if(NOT _code EQUAL 0)
+      message(FATAL_ERROR "Could not fetch OpenH264 header ${_name}: ${_status}")
+    endif()
+  endforeach()
+  add_library(jc_openh264_headers INTERFACE)
+  target_include_directories(jc_openh264_headers SYSTEM INTERFACE ${_jc_oh264_dir})
+endif()

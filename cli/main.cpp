@@ -243,6 +243,9 @@ int main(int argc, char** argv) {
                       enc.empty() ? "decode only" : enc.c_str());
         else
           std::printf("%-6s %-10s re-encode: no (%s)\n", "", "", (*t)["reason"].asString().c_str());
+        if (f["id"].asString() == "mp4")
+          for (auto& note : (*t)["backends"].items())
+            std::printf("%-6s %-10s   %s\n", "", "", note.asString().c_str());
       }
     }
     return 0;

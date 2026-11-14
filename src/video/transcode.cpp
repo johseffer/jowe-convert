@@ -268,6 +268,7 @@ bool needsTranscode(const VideoOptions& o, const MovieTrack& v) {
 
 TranscodeCapability videoTranscodeCapability() {
   TranscodeCapability c;
+  c.notes = videoBackendNotes();
   std::string reason;
   const jc_video_backend* b = pickVideoBackend("avc1", "avc1", &reason);
   if (!b) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Linux video re-encoding:** the backend is chosen at run time from VA-API, V4L2 memory-to-memory and Cisco's
+  OpenH264 2.6 (loaded with `dlopen` from `JOWE_CONVERT_OPENH264` or `libopenh264.so.8`; never built or linked).
+  OpenH264 does H.264; VA-API and V4L2 devices are detected and reported but not driven yet. `formats` lists every
+  candidate with the reason it is or isn't used (`transcode.backends` in JSON / MCP).
+
 ## 0.2.1
 
 - **HEVC / H.264 with B-frames from AVFoundation:** composition offsets (`ctts`) are read as signed in both box
