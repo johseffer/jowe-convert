@@ -1,6 +1,7 @@
 #include "../audio/audio.hpp"
 #include "../image/image.hpp"
 #include "plugins.hpp"
+#include "../video/transcode.hpp"
 
 namespace jowe::convert {
 
@@ -113,9 +114,18 @@ std::vector<FormatCapability> listFormats() {
     v.push_back(f);
   }
 
-  v.push_back(make("mp4", "MP4", V, {"mp4"}, "built-in demuxer", "built-in muxer (remux)"));
-  v.push_back(make("mov", "MOV", V, {"mov", "qt"}, "built-in demuxer", "built-in muxer (remux)"));
-  v.push_back(make("m4v", "M4V", V, {"m4v"}, "built-in demuxer", nullptr, "M4V is read only: write MP4"));
+  {
+    const auto cap = detail::videoTranscodeCapability();
+    for (auto f : {make("mp4", "MP4", V, {"mp4"}, "built-in demuxer", "built-in muxer"),
+                   make("mov", "MOV", V, {"mov", "qt"}, "built-in demuxer", "built-in muxer"),
+                   make("m4v", "M4V", V, {"m4v"}, "built-in demuxer", nullptr, "M4V is read only: write MP4")}) {
+      f.canTranscode = cap.available;
+      f.transcodeBackend = cap.backend;
+      f.transcodeReason = cap.available ? "" : cap.reason;
+      if (f.canWrite) f.videoEncoders = cap.encoders;
+      v.push_back(f);
+    }
+  }
 
   v.push_back(make("usdz", "USDZ", M, {"usdz"}, "TinyUSDZ", "built-in USDZ writer"));
   v.push_back(make("usda", "USDA", M, {"usda"}, "TinyUSDZ", "built-in USDA writer"));

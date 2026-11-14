@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "isobmff.hpp"
+#include "transcode.hpp"
 
 namespace jowe::convert::detail {
 
@@ -53,6 +54,23 @@ Result convertVideo(const Context& ctx, const fs::path& in, const std::string&, 
   std::string err;
   if (!parseMovieFile(in, mv, err)) return Result::error(Status::Unreadable, "This video can't be read: " + err);
 
+  const VideoOptions& vopt = ctx.options->video;
+  for (auto& t : mv.tracks) {
+    if (t.handler != "vide" || t.samples.empty()) continue;
+    if (needsTranscode(vopt, t)) {
+      if (auto r = transcodeVideo(ctx, in, mv, out, outFormat); !r) return r;
+      std::error_code ec;
+      outInfo.kind = MediaKind::Video;
+      outInfo.format = outFormat;
+      outInfo.fileSize = fs::file_size(out, ec);
+      probeVideo(ctx, out, outInfo);
+      outInfo.format = outFormat;
+      ctx.progress(1.0);
+      return Result::ok();
+    }
+    break;
+  }
+
   Movie kept = mv;
   kept.tracks.clear();
   for (auto& t : mv.tracks) {
@@ -61,10 +79,11 @@ Result convertVideo(const Context& ctx, const fs::path& in, const std::string&, 
       continue;
     }
     if (t.samples.empty()) continue;
+    if (t.handler == "soun" && vopt.audio == VideoOptions::Audio::Drop) continue;
     if (outFormat == "mp4" && !codecAllowedInMp4(t.codec))
       return Result::error(Status::Unsupported, "'" + t.codec +
-                                                    "' can't be carried in MP4 and transcoding is not available in "
-                                                    "this version; convert to MOV instead");
+                                                    "' can't be carried in MP4 without re-encoding; convert to MOV "
+                                                    "or choose a video codec");
     kept.tracks.push_back(t);
   }
   if (kept.tracks.empty()) return Result::error(Status::Unreadable, "The file has no video or audio samples");

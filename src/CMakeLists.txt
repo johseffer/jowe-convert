@@ -16,6 +16,12 @@ add_library(jowe_convert STATIC
   audio/os_audio.cpp
   video/isobmff.cpp
   video/video.cpp
+  video/nal.cpp
+  video/backend.cpp
+  video/backend_mf.cpp
+  video/backend_vt.cpp
+  video/backend_none.cpp
+  video/transcode.cpp
   model/model.cpp
   model/assimp_io.cpp
   model/usd_read.cpp
@@ -57,7 +63,8 @@ if(JOWE_CONVERT_WITH_OS_CODECS AND NOT EMSCRIPTEN)
     target_link_libraries(jowe_convert PRIVATE windowscodecs mfplat mfreadwrite mfuuid ole32)
   elseif(APPLE)
     target_link_libraries(jowe_convert PRIVATE
-      "-framework CoreFoundation" "-framework CoreGraphics" "-framework ImageIO" "-framework AudioToolbox")
+      "-framework CoreFoundation" "-framework CoreGraphics" "-framework ImageIO" "-framework AudioToolbox"
+      "-framework VideoToolbox" "-framework CoreMedia" "-framework CoreVideo")
   endif()
 endif()
 

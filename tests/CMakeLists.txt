@@ -10,6 +10,13 @@ set(_jc_test_names
   audio_encoded_targets
   video_remux_mp4_mov
   video_errors
+  video_transcode_capability
+  video_transcode_1080_to_720
+  video_transcode_audio_drop
+  video_transcode_bitrate
+  video_transcode_frame_rate_cap
+  video_transcode_hevc
+  video_transcode_cancel
   model_obj_usdz_glb_roundtrip
   model_all_writers
   model_units_and_axis
@@ -25,12 +32,16 @@ add_executable(jc_tests
   test_image.cpp
   test_audio.cpp
   test_video.cpp
+  test_transcode.cpp
   test_model.cpp
   test_plugin.cpp)
 target_include_directories(jc_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(jc_tests PRIVATE jowe::convert)
 target_compile_definitions(jc_tests PRIVATE JC_MINIMP3_VECTORS="${minimp3_SOURCE_DIR}/vectors"
   JC_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+if(JOWE_CONVERT_WITH_OS_CODECS AND (WIN32 OR APPLE) AND NOT EMSCRIPTEN)
+  target_compile_definitions(jc_tests PRIVATE JC_EXPECT_VIDEO_ENCODER)
+endif()
 if(MSVC)
   target_compile_options(jc_tests PRIVATE /utf-8 /wd4996)
   target_compile_definitions(jc_tests PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)

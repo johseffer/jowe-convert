@@ -41,6 +41,7 @@ struct MovieTrack {
   int channels = 0;
   bool hasSyncTable = false;
   bool hasCtts = false;
+  int source = 0;  // index into the streams handed to writeMovie
   std::vector<MovieSample> samples;
 
   uint64_t durationTicks() const;
@@ -69,6 +70,9 @@ struct MuxOptions {
 // Writes movie into out, copying each sample's bytes from source (offsets in MovieSample).
 bool writeMovie(const Movie& movie, std::istream& source, std::ostream& out, const MuxOptions& opt,
                 std::string& err, const std::function<bool(double)>& progress = {});
+// Same, with each track's samples read from sources[track.source].
+bool writeMovie(const Movie& movie, const std::vector<std::istream*>& sources, std::ostream& out,
+                const MuxOptions& opt, std::string& err, const std::function<bool(double)>& progress = {});
 
 bool codecAllowedInMp4(const std::string& codec);
 

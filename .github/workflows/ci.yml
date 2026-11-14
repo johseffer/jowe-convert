@@ -149,7 +149,8 @@ jobs:
         run: |
           set -euo pipefail
           slice=$(ls -d jowe-convert-apple.xcframework/macos-*)
-          clang++ -std=c++17 apple/smoke/smoke.cpp -I "$slice/Headers" "$slice/libjowe_convert.a"             -lz -framework AudioToolbox -framework CoreFoundation -framework CoreGraphics -framework ImageIO -o smoke
+          clang++ -std=c++17 apple/smoke/smoke.cpp -I "$slice/Headers" "$slice/libjowe_convert.a"             -lz -framework AudioToolbox -framework CoreFoundation -framework CoreGraphics -framework ImageIO \
+            -framework VideoToolbox -framework CoreMedia -framework CoreVideo -o smoke
           mkdir -p smoke-out && ./smoke smoke-out
 
       - name: Smoke test (SwiftPM binaryTarget, Swift / C++ interop)

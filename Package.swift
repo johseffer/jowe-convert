@@ -29,6 +29,9 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
                 .linkedFramework("CoreGraphics"),
                 .linkedFramework("ImageIO"),
+                .linkedFramework("VideoToolbox"),
+                .linkedFramework("CoreMedia"),
+                .linkedFramework("CoreVideo"),
             ]
         ),
     ],

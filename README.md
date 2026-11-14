@@ -25,7 +25,7 @@ What a machine can write is asked at run time: OS codecs and encoder plugins cha
 | Audio | FLAC | yes | yes | libFLAC, 16 / 24-bit |
 | Audio | MP3 | yes | Windows; elsewhere through an encoder plugin | decode: minimp3; encode: Media Foundation or a plugin |
 | Audio | M4A (AAC) | Windows, macOS | Windows, macOS | OS codecs only (Media Foundation / AudioToolbox); unsupported on Linux and wasm for now |
-| Video | MP4, MOV | yes | yes | remux between the two with our ISO-BMFF muxer; no re-encoding in v0.1 |
+| Video | MP4, MOV | yes | yes | remux with our ISO-BMFF muxer; re-encode to H.264 (HEVC where the OS has an encoder) on Windows and Apple |
 | Video | M4V | yes | no | write MP4 instead |
 | 3D | USDZ | yes | yes | read: TinyUSDZ; write: ours (uncompressed zip, 64-byte aligned, USDA + PNG / JPEG textures, UsdPreviewSurface) |
 | 3D | USDA, USD | yes | yes | USD is written as text (USDA) |
@@ -97,7 +97,7 @@ workflow prints (the same as `swift package compute-checksum jowe-convert-apple.
 
 `import JoweConvert` exposes the C++ API (Swift / C++ interop), `import JoweConvertC` the plugin C ABI. The
 `JoweConvert` product also links the system libraries the static library needs (libc++, libz, AudioToolbox,
-CoreFoundation, CoreGraphics, ImageIO).
+CoreFoundation, CoreGraphics, ImageIO, VideoToolbox, CoreMedia, CoreVideo).
 
 ### Releases
 
@@ -136,6 +136,7 @@ jvconvert probe chair.usdz --json
 jvconvert photo.heic photo.jpg --quality 85 --max-size 2048
 jvconvert song.wav song.flac --bit-depth 24 --sample-rate 48000
 jvconvert clip.mp4 clip.mov
+jvconvert clip.mov small.mp4 --resolution 720 --video-bitrate 2500 --max-fps 30 --audio aac
 jvconvert scan.obj scan.usdz --up-axis z-to-y --scale 0.001
 jvconvert plugins
 ```
@@ -179,6 +180,35 @@ executable, and from `--plugin <library>`. Library users call `jowe::convert::lo
 dynamic loading (wasm), `registerEncoderPlugin()` with a table linked in by the host. `tests/plugin/test_encoder.c`
 is a complete minimal plugin.
 
+## Video re-encoding
+
+MP4 / MOV / M4V are remuxed (no quality loss) unless a video option asks for re-encoding:
+
+| Option | CLI | MCP | Values |
+|---|---|---|---|
+| Codec | `--video-codec` | `video_codec` | `keep` (remux when nothing else changes), `h264`, `hevc` |
+| Resolution | `--resolution` | `resolution` | `keep`, `2160`, `1080`, `720`, `480` (short side, never upscales) |
+| Bitrate | `--video-bitrate` / `--video-quality` | `video_bitrate_kbps` / `video_quality` | kbit/s, or `low` / `medium` / `high` (0.05 / 0.10 / 0.16 bit per pixel per frame, HEVC 0.6×) |
+| Frame rate | `--max-fps` | `max_fps` | frames are dropped down to this rate |
+| Soundtrack | `--audio` | `audio` | `keep` (copied), `aac` (re-encoded with the OS encoder), `drop` |
+
+The library demuxes the source, decodes with the OS decoder, scales (box filter) and drops frames itself, encodes
+with the OS encoder (constant bitrate, no B-frames, a keyframe every 2 s) and writes the result with its own
+ISO-BMFF muxer, so MOV output works on Windows too. `listFormats()` reports `canTranscode`, the backend, the
+encoders (`h264`, `hevc`) and the reason when re-encoding is not available.
+
+| Platform | Backend | H.264 | HEVC |
+|---|---|---|---|
+| Windows | Media Foundation (synchronous MFTs) | yes | when a synchronous HEVC encoder MFT is installed |
+| macOS, iOS, Mac Catalyst | VideoToolbox | yes | where the device has an HEVC encoder |
+| Linux | none | unsupported (remux only) | unsupported |
+| Android, web | host-supplied | through `registerVideoBackend()` | through `registerVideoBackend()` |
+
+Android (MediaCodec) and the web (WebCodecs, through a JS bridge) plug in with the C table `jc_video_backend` in
+[`include/jowe/convert_plugin.h`](include/jowe/convert_plugin.h): decode MP4-style samples to NV12 frames and
+encode NV12 frames to MP4-style samples. The calls are synchronous, so a WebCodecs bridge has to wait for its
+promises (Asyncify, or a worker with `Atomics.wait`).
+
 ## Licences of the dependencies
 
 | Library | Used for | Licence |
@@ -190,14 +220,16 @@ is a complete minimal plugin.
 | [libFLAC](https://github.com/xiph/flac) 1.5.0 | FLAC | BSD-3-Clause |
 | [minimp3](https://github.com/lieff/minimp3) (commit `ea99364`, the project has no tags) | MP3 decode | CC0-1.0 |
 | [kvazaar](https://github.com/ultravideo/kvazaar) v2.3.2 | HEVC encode for HEIC | BSD-3-Clause |
-| OS codecs (Media Foundation, WIC, AudioToolbox, ImageIO) | AAC, MP3 encode on Windows, HEIC / AVIF decode | part of the OS |
+| OS codecs (Media Foundation, WIC, AudioToolbox, ImageIO, VideoToolbox) | AAC, MP3 encode on Windows, HEIC / AVIF decode, H.264 / HEVC video | part of the OS |
 
 Our own code covers the ISO-BMFF (MP4 / MOV) demuxer and muxer, the HEIF writer, the USDA / USDZ writers, the zip
 writer, WAV / AIFF / CAF, the TIFF codec and the resampler. Nothing GPL or LGPL is built into the library.
 
 ## Status (v0.1)
 
-- Video is remuxed only (MP4 ⇄ MOV, any codec the target container can carry). Transcoding returns `unsupported`.
+- Video re-encoding needs an OS codec: Media Foundation (Windows) or VideoToolbox (macOS / iOS). Linux reports it
+  as unsupported; Android and the web need a host backend (see below). The rotation of the source is kept as a
+  track matrix rather than baked into the pixels.
 - Audio and images are decoded whole in memory; very long recordings need RAM accordingly.
 - HEIC read needs an OS decoder (Windows with the HEIF and HEVC extensions, macOS); Linux and wasm report it as
   unsupported. HEIC images above ~35 megapixels are refused (no grid tiling yet).
