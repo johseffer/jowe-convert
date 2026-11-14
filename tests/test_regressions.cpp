@@ -149,7 +149,8 @@ TEST(video_ctts_signed_offsets) {
 TEST(video_transcode_bframes_ctts) {
   if (!canReencode()) return;
   fs::path dir = dirFor("bframes");
-  auto r = writeSyntheticClip(dir / "b.mp4", 1280, 720, 30, 45, true, "avc1", 6000, 8, 2);
+  auto m4a = jc::findFormat("m4a");
+  auto r = writeSyntheticClip(dir / "b.mp4", 1280, 720, 30, 45, m4a && m4a->canWrite, "avc1", 6000, 8, 2);
   REQUIRE(r);
   Movie m;
   std::string err;
@@ -196,6 +197,11 @@ TEST(video_transcode_bframes_ctts) {
 TEST(video_transcode_audio_edit_list) {
   if (!canReencode()) return;
   fs::path dir = dirFor("primed");
+  auto m4a = jc::findFormat("m4a");
+  if (!m4a || !m4a->canWrite) {
+    std::fprintf(stderr, "  skipped: no AAC encoder for the fixture's soundtrack\n");
+    return;
+  }
   REQUIRE(writeSyntheticClip(dir / "src.mp4", 1280, 720, 30, 45, true));
   const int64_t priming = 2112;
   uint64_t audioDuration = 0;

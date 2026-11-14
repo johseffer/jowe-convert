@@ -54,6 +54,7 @@ struct FormatCapability {
   std::string transcodeBackend;
   std::string transcodeReason;
   std::vector<std::string> videoEncoders;  // "h264", "hevc"
+  std::vector<std::string> transcodeNotes; // which backends were considered and why (Linux)
 };
 
 // Asked at run time: OS codecs and loaded plugins change the answer.

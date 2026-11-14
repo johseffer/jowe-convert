@@ -10,6 +10,7 @@ struct TranscodeCapability {
   std::string backend;
   std::string reason;
   std::vector<std::string> encoders;  // "h264", "hevc"
+  std::vector<std::string> notes;     // per-backend lines (Linux)
 };
 TranscodeCapability videoTranscodeCapability();
 

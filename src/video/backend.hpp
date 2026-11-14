@@ -10,6 +10,8 @@ namespace jowe::convert::detail {
 const jc_video_backend* builtinVideoBackend();
 // Why there is no built-in backend on this platform (empty when there is one).
 std::string noBuiltinVideoBackendReason();
+// One line per backend this platform considered (Linux lists VA-API, V4L2 and OpenH264), best first.
+std::vector<std::string> videoBackendNotes();
 
 std::vector<const jc_video_backend*> videoBackends();
 

@@ -24,6 +24,13 @@ endif()
 option(JOWE_CONVERT_BUILD_CLI "Build the jvconvert CLI and MCP server" ON)
 option(JOWE_CONVERT_BUILD_TESTS "Build the unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(JOWE_CONVERT_WITH_HEIC_ENCODER "Encode HEIC with kvazaar (BSD-3)" ${_jc_heic_default})
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID AND NOT EMSCRIPTEN)
+  set(_jc_openh264_default ON)
+else()
+  set(_jc_openh264_default OFF)
+endif()
+option(JOWE_CONVERT_WITH_OPENH264 "Linux: use Cisco's OpenH264 binary at run time (only its API headers are fetched)"
+       ${_jc_openh264_default})
 option(JOWE_CONVERT_WITH_OS_CODECS "Use OS codecs (Media Foundation, WIC, AudioToolbox, ImageIO) where present" ON)
 
 if(EMSCRIPTEN)

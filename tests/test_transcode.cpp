@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "test_util.hpp"
 #include "video/isobmff.hpp"
 #include "video/nal.hpp"
@@ -41,8 +42,17 @@ bool capable() {
   return cap.available;
 }
 
+bool aacAvailable() {
+  auto f = jc::findFormat("m4a");
+  return f && f->canWrite;
+}
+
 fs::path synthetic(const std::string& name, int w, int h, int fps, int frames, bool audio, int kbps = 8000,
                    int noise = 32) {
+  if (audio && !aacAvailable()) {
+    std::fprintf(stderr, "  no AAC encoder here: the synthetic clip has no soundtrack\n");
+    audio = false;
+  }
   fs::path dir = tempDir() / "transcode";
   fs::create_directories(dir);
   fs::path p = dir / name;
@@ -64,13 +74,20 @@ TEST(video_transcode_capability) {
   REQUIRE(mp4 && mov);
   auto cap = videoTranscodeCapability();
   CHECK(mp4->canTranscode == cap.available && mov->canTranscode == cap.available);
+  for (auto& note : cap.notes) std::fprintf(stderr, "  %s\n", note.c_str());
 #if defined(JC_EXPECT_VIDEO_ENCODER)
+  const bool expected = true;
+#else
+  const bool expected = std::getenv("JC_EXPECT_VIDEO_ENCODER") != nullptr;
+#endif
+  if (expected) {
   CHECK(cap.available);
   CHECK(!mp4->videoEncoders.empty() && mp4->videoEncoders[0] == "h264");
   std::fprintf(stderr, "  backend %s, encoders:", cap.backend.c_str());
   for (auto& e : cap.encoders) std::fprintf(stderr, " %s", e.c_str());
   std::fprintf(stderr, "\n");
-#else
+  return;
+  }
   CHECK(!cap.available);
   CHECK(!mp4->transcodeReason.empty());
   std::fprintf(stderr, "  not available: %s\n", mp4->transcodeReason.c_str());
@@ -115,7 +132,6 @@ TEST(video_transcode_capability) {
   o.video = jc::VideoOptions{};
   auto remux = jc::convert(dir / "fake.mp4", dir / "remux.mov", o);
   CHECK_OK(remux);
-#endif
 }
 
 TEST(video_transcode_1080_to_720) {
@@ -139,7 +155,8 @@ TEST(video_transcode_1080_to_720) {
     CHECK(v.samples == in.samples);
     CHECK(std::fabs(v.seconds - in.seconds) <= 1.0 / 30 + 1e-6);
     CHECK(v.codec == "avc1");
-    CHECK(trackStats(out, "soun", a) && a.codec == "mp4a");
+    TrackStats srcAudio;
+    if (trackStats(src, "soun", srcAudio)) CHECK(trackStats(out, "soun", a) && a.codec == "mp4a");
     CHECK(rep.output.width == 1280 && rep.output.height == 720);
   }
 }
@@ -148,7 +165,10 @@ TEST(video_transcode_audio_drop) {
   if (!capable()) return;
   fs::path src = synthetic("src1080.mp4", 1920, 1080, 30, 60, true);
   TrackStats a;
-  REQUIRE(trackStats(src, "soun", a));
+  if (!trackStats(src, "soun", a)) {
+    std::fprintf(stderr, "  skipped: no soundtrack to drop (no AAC encoder for the fixture)\n");
+    return;
+  }
   jc::ConvertOptions o;
   o.video.maxShortSide = 480;
   o.video.audio = jc::VideoOptions::Audio::Drop;

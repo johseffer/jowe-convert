@@ -216,8 +216,45 @@ encoders (`h264`, `hevc`) and the reason when re-encoding is not available.
 |---|---|---|---|
 | Windows | Media Foundation (synchronous MFTs) | yes | when a synchronous HEVC encoder MFT is installed |
 | macOS, iOS, Mac Catalyst | VideoToolbox | yes | where the device has an HEVC encoder |
-| Linux | none | unsupported (remux only) | unsupported |
+| Linux | best of: VA-API, V4L2 M2M (detected, not driven yet), Cisco OpenH264 2.6 (loaded at run time) | yes, with OpenH264 | no (needs hardware; reported with the reason) |
 | Android, web | host-supplied | through `registerVideoBackend()` | through `registerVideoBackend()` |
+
+### Linux
+
+The Linux backend is picked at run time, best first:
+
+1. **VA-API** (Intel / AMD GPUs; libva is opened with `dlopen`, MIT). Detected and reported with its H.264 / HEVC
+   entry points; driving it is not implemented yet, so it is listed as "not used".
+2. **V4L2 memory-to-memory** (Raspberry Pi and other ARM SoCs). Detected and reported the same way; not driven yet.
+3. **Cisco OpenH264 2.6** (BSD-2), H.264 decode and encode in software. jowe-convert never builds or links
+   OpenH264: it only fetches its four API headers and opens Cisco's prebuilt `libopenh264.so.8` at run time, so the
+   binary users run is Cisco's and Cisco's H.264 patent licence covers it. HEVC sources need a hardware decoder and
+   are refused with that reason.
+
+`jvconvert formats` (and the JSON / MCP `transcode.backends` list) prints one line per candidate with what was
+found and why it is or isn't used.
+
+The host app installs OpenH264 by downloading Cisco's binary itself (Cisco's licence requires the user to get the
+binary from Cisco), checking it, and pointing jowe-convert at it with `JOWE_CONVERT_OPENH264=/path/libopenh264.so.8`
+(or installing it where `dlopen("libopenh264.so.8")` finds it):
+
+| Platform | URL | SHA-256 of the `.bz2` |
+|---|---|---|
+| Linux x86_64 | `https://ciscobinary.openh264.org/libopenh264-2.6.0-linux64.8.so.bz2` | `27ab53323c110b76214c1c72222f459d17febbcd1e252136cadc292b0308d75b` |
+| Linux arm64 | `https://ciscobinary.openh264.org/libopenh264-2.6.0-linux-arm64.8.so.bz2` | `a78aea7970150f46bcd3bb7994c9e6dd90bd7a9ea785920f5a73f6964e3fcda7` |
+
+```sh
+f=libopenh264-2.6.0-linux64.8.so.bz2
+curl -fLO "https://ciscobinary.openh264.org/$f"
+echo "27ab53323c110b76214c1c72222f459d17febbcd1e252136cadc292b0308d75b  $f" | sha256sum -c -
+bunzip2 -c "$f" > ~/.local/lib/libopenh264.so.8
+export JOWE_CONVERT_OPENH264=~/.local/lib/libopenh264.so.8
+```
+
+Only OpenH264 2.6.x is accepted (its C++ interfaces change between minor versions); another version is reported
+with the reason. Build with `-DJOWE_CONVERT_WITH_OPENH264=OFF` to leave it out.
+
+### Android and the web
 
 Android (MediaCodec) and the web (WebCodecs, through a JS bridge) plug in with the C table `jc_video_backend` in
 [`include/jowe/convert_plugin.h`](include/jowe/convert_plugin.h): decode MP4-style samples to NV12 frames and
@@ -235,6 +272,7 @@ promises (Asyncify, or a worker with `Atomics.wait`).
 | [libFLAC](https://github.com/xiph/flac) 1.5.0 | FLAC | BSD-3-Clause |
 | [minimp3](https://github.com/lieff/minimp3) (commit `ea99364`, the project has no tags) | MP3 decode | CC0-1.0 |
 | [kvazaar](https://github.com/ultravideo/kvazaar) v2.3.2 | HEVC encode for HEIC | BSD-3-Clause |
+| [OpenH264](https://github.com/cisco/openh264) v2.6.0 API headers; Cisco's binary loaded at run time | H.264 on Linux | BSD-2-Clause (binary: Cisco, with Cisco's H.264 patent licence) |
 | OS codecs (Media Foundation, WIC, AudioToolbox, ImageIO, VideoToolbox) | AAC, MP3 encode on Windows, HEIC / AVIF decode, H.264 / HEVC video | part of the OS |
 
 Our own code covers the ISO-BMFF (MP4 / MOV) demuxer and muxer, the HEIF writer, the USDA / USDZ writers, the zip
@@ -242,8 +280,8 @@ writer, WAV / AIFF / CAF, the TIFF codec and the resampler. Nothing GPL or LGPL 
 
 ## Status (v0.1)
 
-- Video re-encoding needs an OS codec: Media Foundation (Windows) or VideoToolbox (macOS / iOS). Linux reports it
-  as unsupported; Android and the web need a host backend (see below).
+- Video re-encoding needs an OS codec: Media Foundation (Windows), VideoToolbox (macOS / iOS) or, on Linux, Cisco's
+  OpenH264 binary (H.264 only; see below). Android and the web need a host backend.
 - Audio and images are decoded whole in memory; very long recordings need RAM accordingly.
 - HEIC read needs an OS decoder (Windows with the HEIF and HEVC extensions, macOS); Linux and wasm report it as
   unsupported. HEIC images above ~35 megapixels are refused (no grid tiling yet).

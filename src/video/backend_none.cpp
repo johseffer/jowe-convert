@@ -1,6 +1,6 @@
 #include "backend.hpp"
 
-#if !(defined(JOWE_CONVERT_OS_CODECS) && (defined(_WIN32) || defined(__APPLE__)))
+#if !(defined(JOWE_CONVERT_OS_CODECS) &&       (defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__ANDROID__))))
 
 namespace jowe::convert::detail {
 
@@ -14,9 +14,11 @@ std::string noBuiltinVideoBackendReason() {
 #elif defined(_WIN32) || defined(__APPLE__)
   return "This build has OS codecs turned off (JOWE_CONVERT_WITH_OS_CODECS=OFF)";
 #else
-  return "No permissive video encoder on this platform: MP4 / MOV can be remuxed, not re-encoded";
+  return "No video encoder on this platform: MP4 / MOV can be remuxed, not re-encoded";
 #endif
 }
+
+std::vector<std::string> videoBackendNotes() { return {}; }
 
 }  // namespace jowe::convert::detail
 

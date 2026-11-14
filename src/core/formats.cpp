@@ -122,6 +122,7 @@ std::vector<FormatCapability> listFormats() {
       f.canTranscode = cap.available;
       f.transcodeBackend = cap.backend;
       f.transcodeReason = cap.available ? "" : cap.reason;
+      f.transcodeNotes = cap.notes;
       if (f.canWrite) f.videoEncoders = cap.encoders;
       v.push_back(f);
     }

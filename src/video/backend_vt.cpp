@@ -418,6 +418,7 @@ const jc_video_backend kVt = {
 
 const jc_video_backend* builtinVideoBackend() { return &kVt; }
 std::string noBuiltinVideoBackendReason() { return {}; }
+std::vector<std::string> videoBackendNotes() { return {}; }
 
 }  // namespace jowe::convert::detail
 

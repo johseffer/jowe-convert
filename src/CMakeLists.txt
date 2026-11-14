@@ -21,6 +21,8 @@ add_library(jowe_convert STATIC
   video/backend_mf.cpp
   video/backend_vt.cpp
   video/backend_none.cpp
+  video/backend_linux.cpp
+  video/linux_select.cpp
   video/transcode.cpp
   model/model.cpp
   model/assimp_io.cpp
@@ -67,6 +69,11 @@ if(JOWE_CONVERT_WITH_OS_CODECS AND NOT EMSCRIPTEN)
       "-framework CoreFoundation" "-framework CoreGraphics" "-framework ImageIO" "-framework AudioToolbox"
       "-framework VideoToolbox" "-framework CoreMedia" "-framework CoreVideo")
   endif()
+endif()
+
+if(JOWE_CONVERT_WITH_OPENH264)
+  target_link_libraries(jowe_convert PRIVATE jc_openh264_headers)
+  target_compile_definitions(jowe_convert PRIVATE JOWE_CONVERT_HAS_OPENH264)
 endif()
 
 if(NOT WIN32 AND NOT EMSCRIPTEN)

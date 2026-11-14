@@ -27,6 +27,11 @@ Json toJson(const jc::FormatCapability& f) {
     if (!f.transcodeBackend.empty()) t.set("backend", f.transcodeBackend);
     if (!f.canTranscode) t.set("reason", f.transcodeReason);
     t.set("encoders", enc);
+    if (!f.transcodeNotes.empty()) {
+      Json notes = Json::array();
+      for (auto& note : f.transcodeNotes) notes.push(note);
+      t.set("backends", notes);
+    }
     j.set("transcode", t);
   }
   return j;
