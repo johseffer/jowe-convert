@@ -157,8 +157,7 @@ TEST(video_transcode_audio_drop) {
   TrackStats v, none;
   CHECK(trackStats(src.parent_path() / "noaudio.mp4", "vide", v) && v.height == 480 && v.width == 852);
   CHECK(!trackStats(src.parent_path() / "noaudio.mp4", "soun", none));
-  std::fprintf(stderr, "  mp4: audio dropped -> %dx%d, %zu frames, audio track %s
-", v.width, v.height, v.samples,
+  std::fprintf(stderr, "  mp4: audio dropped -> %dx%d, %zu frames, audio track %s\n", v.width, v.height, v.samples,
                trackStats(src.parent_path() / "noaudio.mp4", "soun", none) ? "present" : "absent");
   jc::ConvertOptions remux;
   remux.video.audio = jc::VideoOptions::Audio::Drop;
@@ -243,8 +242,7 @@ TEST(video_transcode_cancel) {
   auto rep = jc::convert(src, dir / "cancelled.mp4", o);
   CHECK(rep.result.status == jc::Status::Cancelled);
   CHECK(seen > 0.3 && seen < 0.9);
-  std::fprintf(stderr, "  mp4: cancelled at %.0f%% with status %s
-", seen * 100, jc::toString(rep.result.status));
+  std::fprintf(stderr, "  mp4: cancelled at %.0f%% with status %s\n", seen * 100, jc::toString(rep.result.status));
   size_t leftovers = 0;
   for (auto& e : fs::directory_iterator(dir)) {
     std::fprintf(stderr, "  leftover %s\n", e.path().filename().string().c_str());
