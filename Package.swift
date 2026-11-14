@@ -3,8 +3,8 @@ import PackageDescription
 
 // Release values: a release replaces the tag and the checksum below with the ones its workflow prints
 // (`swift package compute-checksum jowe-convert-apple.xcframework.zip`).
-let releaseTag = "v0.0.0"
-let xcframeworkChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
+let releaseTag = "v0.1.0"
+let xcframeworkChecksum = "006aadcad8ba5c4dcf8f7cbbb2516fb322050c60151ca54f2a9a5d33e3fb9814"
 
 let package = Package(
     name: "JoweConvert",
