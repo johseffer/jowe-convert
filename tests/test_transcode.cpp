@@ -41,12 +41,13 @@ bool capable() {
   return cap.available;
 }
 
-fs::path synthetic(const std::string& name, int w, int h, int fps, int frames, bool audio, int kbps = 8000) {
+fs::path synthetic(const std::string& name, int w, int h, int fps, int frames, bool audio, int kbps = 8000,
+                   int noise = 32) {
   fs::path dir = tempDir() / "transcode";
   fs::create_directories(dir);
   fs::path p = dir / name;
   if (!fs::exists(p)) {
-    auto r = writeSyntheticClip(p, w, h, fps, frames, audio, "avc1", kbps);
+    auto r = writeSyntheticClip(p, w, h, fps, frames, audio, "avc1", kbps, noise);
     if (!r) {
       std::fprintf(stderr, "  synthetic clip failed: %s\n", r.message.c_str());
       ++g_failures;
@@ -172,8 +173,8 @@ TEST(video_transcode_audio_drop) {
 
 TEST(video_transcode_bitrate) {
   if (!capable()) return;
-  fs::path src = synthetic("src720_noise.mp4", 1280, 720, 30, 90, false, 12000);
-  for (int kbps : {1500, 4000}) {
+  fs::path src = synthetic("src720_grain.mp4", 1280, 720, 30, 150, false, 20000, 8);
+  for (int kbps : {2000, 5000}) {
     jc::ConvertOptions o;
     o.video.codec = jc::VideoOptions::Codec::H264;
     o.video.bitrateKbps = kbps;

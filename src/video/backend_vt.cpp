@@ -321,16 +321,22 @@ jc_video_encoder* encoderCreate(const jc_video_encoder_config* c, char* err, siz
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_ProfileLevel,
                        e->hevc ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel);
   CFNumberRef br = num(int32_t(c->bitrate_kbps * 1000));
-  VTSessionSetProperty(e->session, kVTCompressionPropertyKey_AverageBitRate, br);
+  // Constant bitrate where the encoder offers it (Apple silicon, macOS 13 / iOS 16); AverageBitRate is only a
+  // soft target and misses short clips by about 30% either way.
+  OSStatus cbr = -1;
+  if (__builtin_available(macOS 13.0, iOS 16.0, macCatalyst 16.0, *))
+    cbr = VTSessionSetProperty(e->session, kVTCompressionPropertyKey_ConstantBitRate, br);
+  if (cbr != noErr) {
+    VTSessionSetProperty(e->session, kVTCompressionPropertyKey_AverageBitRate, br);
+    CFNumberRef bytes = num(int32_t(c->bitrate_kbps * 1000 / 8 * 3 / 2)), window = numd(1.0);
+    const void* limits[2] = {bytes, window};
+    CFArrayRef limitArray = CFArrayCreate(nullptr, limits, 2, &kCFTypeArrayCallBacks);
+    VTSessionSetProperty(e->session, kVTCompressionPropertyKey_DataRateLimits, limitArray);
+    CFRelease(limitArray);
+    CFRelease(bytes);
+    CFRelease(window);
+  }
   CFRelease(br);
-  // AverageBitRate alone is a soft target (short clips overshoot by 15-30%); cap each second as well.
-  CFNumberRef bytes = num(int32_t(c->bitrate_kbps * 1000 / 8)), window = numd(1.0);
-  const void* limits[2] = {bytes, window};
-  CFArrayRef limitArray = CFArrayCreate(nullptr, limits, 2, &kCFTypeArrayCallBacks);
-  VTSessionSetProperty(e->session, kVTCompressionPropertyKey_DataRateLimits, limitArray);
-  CFRelease(limitArray);
-  CFRelease(bytes);
-  CFRelease(window);
   CFNumberRef fps = numd(double(c->fps_num) / c->fps_den);
   VTSessionSetProperty(e->session, kVTCompressionPropertyKey_ExpectedFrameRate, fps);
   CFRelease(fps);

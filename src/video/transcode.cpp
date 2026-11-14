@@ -435,7 +435,7 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& src, 
 }
 
 Result writeSyntheticClip(const fs::path& out, int width, int height, int fps, int frames, bool withAudio,
-                          const std::string& codec, int bitrateKbps) {
+                          const std::string& codec, int bitrateKbps, int noise) {
   std::string reason;
   const jc_video_backend* b = pickVideoBackend("", codec, &reason);
   if (!b) return Result::error(Status::Unsupported, reason);
@@ -466,7 +466,8 @@ Result writeSyntheticClip(const fs::path& out, int width, int height, int fps, i
         rng ^= rng >> 17;
         rng ^= rng << 5;
         const int base = ((x + i * 7) ^ (y + i * 3)) & 0xff;
-        f.y[size_t(y) * width + x] = uint8_t(std::clamp(16 + (base * 219 >> 8) + int(rng & 31) - 16, 16, 235));
+        const int grain = noise > 0 ? int(rng % uint32_t(noise)) - noise / 2 : 0;
+        f.y[size_t(y) * width + x] = uint8_t(std::clamp(16 + (base * 219 >> 8) + grain, 16, 235));
       }
     for (int y = 0; y < height / 2; ++y)
       for (int x = 0; x < width / 2; ++x) {
