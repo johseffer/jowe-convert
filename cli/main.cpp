@@ -46,6 +46,7 @@ const char* kUsage =
     "  --max-fps <fps>        drop frames down to this rate\n"
     "  --audio <keep|aac|drop>  video soundtrack: copy, re-encode to AAC or remove\n"
     "  --audio-bitrate <kbps>\n"
+    "  --rotation <bake|metadata>  on re-encode, rotate pixels upright (default) or keep the track matrix\n"
     "  --no-textures          drop 3D textures\n"
     "  --no-overwrite         fail if the output exists\n"
     "  --plugin <library>     load an encoder plugin\n"

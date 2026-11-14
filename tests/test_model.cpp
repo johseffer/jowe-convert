@@ -263,6 +263,21 @@ TEST(model_fbx_cm_probe_matches_convert) {
       CHECK(std::fabs(rep.output.model.boundsMin[i] - p.info.model.boundsMin[i]) < 1e-4);
     }
   }
+
+  // The written-units rule (README "Units"): USD keeps the source's numbers with metersPerUnit = 0.01, OBJ keeps
+  // centimetres, glTF is in metres.
+  auto text = [&](const fs::path& f) {
+    auto b = readAll(f);
+    return std::string(b.begin(), b.end());
+  };
+  CHECK_OK(jc::convert(dir / "tri_cm.fbx", dir / "tri.obj"));
+  const std::string usda = text(dir / "tri.usda"), obj = text(dir / "tri.obj");
+  CHECK(usda.find("metersPerUnit = 0.01") != std::string::npos);
+  CHECK(usda.find("(200, 0, 0)") != std::string::npos);
+  CHECK(obj.find("v 200 0 0") != std::string::npos || obj.find("v 200.0") != std::string::npos ||
+        obj.find("v 200.000000 0.000000 0.000000") != std::string::npos);
+  CHECK(obj.find("v 2 0 0") == std::string::npos);
+  std::fprintf(stderr, "  FBX cm: USD metersPerUnit 0.01 with points in cm, OBJ in cm, glTF in m\n");
 }
 
 #ifndef JC_FIXTURES

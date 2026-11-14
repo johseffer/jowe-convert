@@ -176,6 +176,12 @@ std::string applyOption(jc::ConvertOptions& o, const std::string& name, const st
     else return "audio must be keep, aac or drop";
     return {};
   }
+  if (name == "rotation") {
+    if (value == "bake") o.video.bakeRotation = true;
+    else if (value == "metadata") o.video.bakeRotation = false;
+    else return "rotation must be bake or metadata";
+    return {};
+  }
   if (name == "audio-bitrate" || name == "audio_bitrate_kbps") return toInt(o.video.audioBitrateKbps, 0, 512);
   if (name == "up-axis" || name == "up_axis") {
     if (value == "keep") o.model.upAxis = jc::ModelOptions::UpAxis::Keep;

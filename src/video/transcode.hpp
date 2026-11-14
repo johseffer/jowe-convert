@@ -22,6 +22,7 @@ Result transcodeVideo(const Context& ctx, const fs::path& in, const Movie& sourc
 // Writes a synthetic clip (moving pattern with noise, optional AAC tone) with the platform encoder.
 // Used by the tests to make fixtures; codec is "avc1" or "hvc1".
 Result writeSyntheticClip(const fs::path& out, int width, int height, int fps, int frames, bool audio,
-                          const std::string& codec = "avc1", int bitrateKbps = 8000, int noise = 32);
+                          const std::string& codec = "avc1", int bitrateKbps = 8000, int noise = 32,
+                          int bFrames = 0);
 
 }  // namespace jowe::convert::detail

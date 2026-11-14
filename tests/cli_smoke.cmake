@@ -8,7 +8,7 @@ if(EMULATOR)
 endif()
 
 execute_process(COMMAND ${run} --version OUTPUT_VARIABLE out RESULT_VARIABLE rc)
-if(NOT rc EQUAL 0 OR NOT out MATCHES "jvconvert [0-9]+\.[0-9]+\.[0-9]+")
+if(NOT rc EQUAL 0 OR NOT out MATCHES "jvconvert ${VERSION}")
   message(FATAL_ERROR "--version: ${rc} ${out}")
 endif()
 
