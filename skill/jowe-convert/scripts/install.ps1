@@ -1,4 +1,4 @@
-# Installs jvconvert v0.3.0 on Windows x64.
+# Installs jvconvert v0.3.1 on Windows x64.
 # Downloads one file from the jowe-convert GitHub release, checks its SHA-256 and
 # copies jvconvert.exe into a folder (default: %LOCALAPPDATA%\Programs\jvconvert).
 #
@@ -9,10 +9,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
-$Version = 'v0.3.0'
+$Version = 'v0.3.1'
 $Asset = "jvconvert-$Version-windows-x64.zip"
 $Url = "https://github.com/johseffer/jowe-convert/releases/download/$Version/$Asset"
-$Sha = 'c58f5ab55fdf25bc2ed81c2512fc7b6292481519389148f8ed3145f151861377'
+$Sha = 'a1c055a15645fdfea952e32e0f4e0cf925b90d020911286342b7264f0d66cc2a'
 
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'jvconvert needs 64-bit Windows.' }
 

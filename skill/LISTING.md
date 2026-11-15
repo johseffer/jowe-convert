@@ -1,6 +1,6 @@
 # Agensi listing: jowe-convert
 
-Upload file: `skill/dist/jowe-convert-skill-v0.3.0.zip` (SKILL.md, references/formats.md, scripts/, LICENSE).
+Upload file: `skill/dist/jowe-convert-skill-v0.3.1.zip` (SKILL.md, references/formats.md, scripts/, LICENSE).
 
 Suggested price: **Free**. The skill and the binary are Apache-2.0 and public on GitHub, so a paid
 listing would compete with the free copy (and Agensi rejects repackaged free skills). The goal is
