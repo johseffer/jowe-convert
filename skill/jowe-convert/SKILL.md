@@ -14,22 +14,23 @@ Made by Jowe — jowe.app / jowe.ai. Source: https://github.com/johseffer/jowe-c
 
 ## 1. Install
 
-Pick the release binary for the platform. Every download below is a file of the official v0.3.0
+Pick the release binary for the platform. Every download below is a file of the official v0.3.1
 GitHub release; always check its SHA-256 before running it.
 
 | Platform | Release file | SHA-256 |
 |---|---|---|
-| Windows x64 | `jvconvert-v0.3.0-windows-x64.zip` | `c58f5ab55fdf25bc2ed81c2512fc7b6292481519389148f8ed3145f151861377` |
-| macOS arm64 (Apple silicon) | `jvconvert-v0.3.0-macos-arm64.tar.gz` | `af43a2eed876cc10c30ce669957bf7f1520aa9f9c093bf310e1a709e019637e9` |
-| Linux x86_64 (glibc 2.43+) | `jvconvert-v0.3.0-linux-x64.tar.gz` | `9d7fa56f04c0fb09e1f132ae1665ccad1b543bc4b9542eb6c8d11acd9603ec0e` |
-| Linux arm64 (glibc 2.38+) | `jvconvert-v0.3.0-linux-arm64.tar.gz` | `bc739d2efa02d6bf02844d3909e9513b311b445dba5d4371183495751cce3010` |
-| WebAssembly (Node.js CLI) | `jvconvert-v0.3.0-wasm.zip` | `05c920db583a1c91114cddcd771f7be51ed1b0f3c1983951a4c69910f443fc0d` |
+| Windows x64 | `jvconvert-v0.3.1-windows-x64.zip` | `a1c055a15645fdfea952e32e0f4e0cf925b90d020911286342b7264f0d66cc2a` |
+| macOS arm64 (Apple silicon) | `jvconvert-v0.3.1-macos-arm64.tar.gz` | `746a2f094b0394d07a56dafe30ca384774fd1dc070abd0ea8b6fbdbd9dd79cda` |
+| Linux x86_64 (glibc 2.35+) | `jvconvert-v0.3.1-linux-x64.tar.gz` | `8173e53b4f3d7877296b87d52293eabbde84f2f976d7318d545b6bdd9a4cf5ee` |
+| Linux arm64 (glibc 2.35+) | `jvconvert-v0.3.1-linux-arm64.tar.gz` | `88c5ef24038c13e5fac9fcf599fee1540e8ff2714c33a257890441398b5b90b4` |
+| WebAssembly (Node.js CLI) | `jvconvert-v0.3.1-wasm.zip` | `e599a5762aed3657d6cbd858de3f4d0e0dc4c0e6b8b8b1b42f957d57400f33cf` |
 
-Download URL: `https://github.com/johseffer/jowe-convert/releases/download/v0.3.0/<release file>`.
+Download URL: `https://github.com/johseffer/jowe-convert/releases/download/v0.3.1/<release file>`.
 The release also has a `SHA256SUMS` file with the same values.
 
-There is no prebuilt binary for Intel Macs, and the Linux x86_64 build needs a recent glibc
-(`ldd --version`; Ubuntu 24.04 and Debian 13 are too old). In those cases build from source (section 1.4).
+There is no prebuilt binary for Intel Macs. The Linux builds need glibc 2.35 or newer (`ldd --version`):
+Ubuntu 22.04+, Debian 12+ and other distributions of that age work. On an Intel Mac or an older Linux,
+build from source (section 1.4).
 
 Before downloading anything, tell the user the URL and where the binary will go, and ask them to confirm.
 
@@ -57,18 +58,18 @@ sh scripts/install.sh                     # or: sh scripts/install.sh /some/bin/
 Windows (PowerShell):
 
 ```powershell
-$f = "jvconvert-v0.3.0-windows-x64.zip"
-Invoke-WebRequest "https://github.com/johseffer/jowe-convert/releases/download/v0.3.0/$f" -OutFile $f
-(Get-FileHash -Algorithm SHA256 $f).Hash   # must equal C58F5AB55FDF25BC2ED81C2512FC7B6292481519389148F8ED3145F151861377
+$f = "jvconvert-v0.3.1-windows-x64.zip"
+Invoke-WebRequest "https://github.com/johseffer/jowe-convert/releases/download/v0.3.1/$f" -OutFile $f
+(Get-FileHash -Algorithm SHA256 $f).Hash   # must equal A1C055A15645FDFEA952E32E0F4E0CF925B90D020911286342B7264F0D66CC2A
 Expand-Archive $f -DestinationPath "$env:LOCALAPPDATA\Programs\jvconvert"
 ```
 
 macOS (use `shasum -a 256 -c`) and Linux (use `sha256sum -c`):
 
 ```sh
-f=jvconvert-v0.3.0-macos-arm64.tar.gz
-curl -fLO "https://github.com/johseffer/jowe-convert/releases/download/v0.3.0/$f"
-echo "af43a2eed876cc10c30ce669957bf7f1520aa9f9c093bf310e1a709e019637e9  $f" | shasum -a 256 -c -
+f=jvconvert-v0.3.1-macos-arm64.tar.gz
+curl -fLO "https://github.com/johseffer/jowe-convert/releases/download/v0.3.1/$f"
+echo "746a2f094b0394d07a56dafe30ca384774fd1dc070abd0ea8b6fbdbd9dd79cda  $f" | shasum -a 256 -c -
 mkdir -p ~/.local/bin && tar -xzf "$f" -C ~/.local/bin ./jvconvert
 ~/.local/bin/jvconvert --version
 ```
@@ -96,7 +97,7 @@ Needs CMake 3.25+ and a C++17 compiler. CMake downloads the dependencies from th
 archives, pinned by SHA-256.
 
 ```sh
-git clone --branch v0.3.0 https://github.com/johseffer/jowe-convert.git
+git clone --branch v0.3.1 https://github.com/johseffer/jowe-convert.git
 cmake -S jowe-convert -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ```
@@ -106,7 +107,7 @@ The binary is `build/cli/jvconvert` (`build\cli\Release\jvconvert.exe` with Visu
 ### 1.5 Check the install
 
 ```sh
-jvconvert --version          # jvconvert 0.3.0
+jvconvert --version          # jvconvert 0.3.1
 jvconvert formats            # what this machine can read and write, with the reason for each "no"
 python3 scripts/mcp_selftest.py /path/to/jvconvert
 ```
