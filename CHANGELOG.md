@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- **Linux release binaries run on older distributions:** linux-x64 and linux-arm64 are now built on Ubuntu 22.04
+  with GCC 12 and need glibc 2.35 (libstdc++ `GLIBCXX_3.4.30`), so they run on Ubuntu 22.04+ and Debian 12+.
+  The v0.3.0 builds needed glibc 2.43 (x64) and 2.38 (arm64), which failed on Ubuntu 24.04 and Debian 13.
+  CI now fails a Linux build whose binary asks for a newer glibc or libstdc++ symbol version.
+- **Agent skill:** `skill/jowe-convert` (SKILL.md, install scripts, MCP self-test) for agent marketplaces.
+
 ## 0.3.0
 
 - **Linux video re-encoding:** the backend is chosen at run time from VA-API, V4L2 memory-to-memory and Cisco's
